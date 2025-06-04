@@ -9,9 +9,9 @@ import {
     GoogleAuthProvider, // NEW for Google Sign-In
     signInWithPopup,    // NEW for Google Sign-In
     signOut             // NEW for Sign-Out
-    // signInAnonymously, // REMOVED - Replaced by Google Sign-In
-    // signInWithCustomToken, 
-    // setPersistence,   // Persistence is handled by Google Sign-In by default
+    // signInAnonymously, // REMOVED
+    // signInWithCustomToken, // REMOVED
+    // setPersistence,      // REMOVED (Firebase handles persistence with Google Sign-In)
     // browserLocalPersistence 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
@@ -22,7 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { 
     getStorage,         // NEW for Image Upload
-    ref,                // NEW
+    ref as storageRef,  // NEW - aliased to avoid conflict with 'ref' from Firestore if used elsewhere
     uploadBytesResumable,// NEW
     getDownloadURL      // NEW
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
@@ -48,12 +48,12 @@ const firebaseConfig = {
   apiKey: "AIzaSyBiV-BFHLVy0EbKIl9gnt2j-QsLUyvkZvs",
   authDomain: "my-personal-recipe-book-8b55d.firebaseapp.com",
   projectId: "my-personal-recipe-book-8b55d",
-  storageBucket: "my-personal-recipe-book-8b55d.appspot.com", // Standard format for storage bucket
+  storageBucket: "my-personal-recipe-book-8b55d.appspot.com", // Ensure this is correct
   messagingSenderId: "932879383972",
   appId: "1:932879383972:web:aa977406634fa061485531",
   measurementId: "G-ZWP1BKDXY4"
 };
-// const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // Not used
+// const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // Not needed
 
 // --- UI Elements (Declared globally, assigned in DOMContentLoaded) ---
 let authStatusDiv, googleSignInBtn, userInfoDiv, userNameSpan, signOutBtn, navigateToAddRecipeBtn, navigateToBrowseBtnDetail, navigateToBrowseBtnForm;
@@ -67,7 +67,7 @@ let editRecipeBtn, deleteRecipeBtn;
 const views = ['browseView', 'recipeDetailView', 'recipeFormView']; 
 
 // --- Function to Show/Hide Views ---
-function showView(viewIdToShow) {
+function showView(viewIdToShow) { /* ... (Keep existing function body) ... */ 
     console.log(`DEBUG: showView - Called for ${viewIdToShow}`);
     views.forEach(viewId => { 
         const viewElement = document.getElementById(viewId);
@@ -98,7 +98,7 @@ function showView(viewIdToShow) {
 }
 
 // Helper function for messages
-function showMessage(element, message, isError = false, duration = 3000) { 
+function showMessage(element, message, isError = false, duration = 3000) { /* ... (Keep existing function body) ... */ 
     if (!element) { console.warn("DEBUG: showMessage - Target element is null. Message:", message); return; }
     element.textContent = message;
     element.classList.remove('hidden');
@@ -113,7 +113,7 @@ async function initializeFirebaseAndAuth() {
     try {
         console.log("DEBUG_INIT: initializeFirebaseAndAuth - START");
         if (!authStatusDiv) { console.error("DEBUG_INIT: authStatusDiv is NULL at start!"); return; }
-        authStatusDiv.textContent = "Initializing..."; // Will be hidden if Google Sign-In button appears
+        authStatusDiv.textContent = "Initializing...";
         if (!firebaseConfig || !firebaseConfig.apiKey) { 
             console.error("DEBUG_INIT: Firebase config error!"); authStatusDiv.textContent = "Config Error!"; return; 
         }
@@ -123,11 +123,9 @@ async function initializeFirebaseAndAuth() {
         storage = getStorage(app); // Initialize Firebase Storage
         console.log("DEBUG_INIT: Firebase core services initialized (app, auth, db, storage).");
         
-        // Persistence for Google Sign-In is handled by Firebase by default (usually 'local')
-        // await setPersistence(auth, browserLocalPersistence); // Not strictly needed for Google Sign-In
-
         onAuthStateChanged(auth, async (user) => {
             console.log("DEBUG_INIT: onAuthStateChanged - Fired. User object present:", !!user);
+            // Re-fetch UI elements related to auth state as they might be initially hidden
             const currentAuthStatusDiv = document.getElementById('authStatus'); 
             const currentGoogleSignInBtn = document.getElementById('googleSignInBtn');
             const currentUserInfoDiv = document.getElementById('userInfo');
@@ -204,20 +202,7 @@ async function handleSignOut() {
 
 
 // --- Ingredient Management Functions ---
-function renderIngredientList() { 
-    if(!ingredientListDisplay) { return; }
-    ingredientListDisplay.innerHTML = '';
-    currentIngredientsArray.forEach((ingredient, index) => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'flex items-center justify-between bg-gray-100 p-2 pl-3 rounded-md text-sm';
-        const textSpan = document.createElement('span'); textSpan.textContent = ingredient; itemDiv.appendChild(textSpan);
-        const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.innerHTML = '&times;'; 
-        removeBtn.className = 'ml-2 text-red-500 hover:text-red-700 font-bold text-lg leading-none px-1';
-        removeBtn.title = 'Remove ingredient';
-        removeBtn.addEventListener('click', () => { currentIngredientsArray.splice(index, 1); renderIngredientList(); });
-        itemDiv.appendChild(removeBtn); ingredientListDisplay.appendChild(itemDiv);
-    });
-}
+function renderIngredientList() { /* ... (Keep existing function body) ... */ }
 
 // --- Recipe Form and Data Handling ---
 async function handleRecipeFormSubmit(event) { 
@@ -237,21 +222,21 @@ async function handleRecipeFormSubmit(event) {
         showMessage(errorMessageDiv, "Title, Category, at least one Ingredient, and Directions are required.", true); return; 
     }
 
-    if (loadingIndicator) loadingIndicator.classList.remove('hidden'); // Show general loading for form submission
+    if (loadingIndicator) loadingIndicator.classList.remove('hidden'); 
 
     if (selectedImageFile) {
         console.log("Image selected, attempting upload:", selectedImageFile.name);
-        const imageName = `${userId}_${Date.now()}_${selectedImageFile.name}`;
+        const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`; // Sanitize name
         const storageRefPath = `recipe_images/${userId}/${imageName}`; 
-        const imageStorageRef = ref(storage, storageRefPath);
+        const imageStorageRefInstance = storageRef(storage, storageRefPath); // Use aliased 'storageRef'
         
-        const uploadTask = uploadBytesResumable(imageStorageRef, selectedImageFile);
+        const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
         
         uploadTask.on('state_changed', 
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                 console.log('Upload is ' + progress + '% done');
-                if (loadingIndicator) loadingIndicator.style.width = progress + '%'; // Update progress bar
+                if (loadingIndicator) loadingIndicator.style.width = progress + '%'; 
             }, 
             (error) => {
                 console.error("Image upload error:", error);
@@ -271,17 +256,16 @@ async function handleRecipeFormSubmit(event) {
             }
         );
     } else {
-        // No new image selected
-        let imageUrlToSave = null;
-        if (recipeIdToEdit) { // If editing, check if there was an existing image to keep or remove
-            if (imagePreview && imagePreview.src !== '#' && !imagePreview.src.startsWith('data:')) {
-                imageUrlToSave = imagePreview.src; // Keep existing image URL
-            } else if (imagePreview && imagePreview.src === '#') {
-                imageUrlToSave = null; // Image was explicitly removed
+        let imageUrlToSave = undefined; 
+        if (recipeIdToEdit) { 
+            if (imagePreview && imagePreview.src === '#') { 
+                imageUrlToSave = null; 
+            } else if (imagePreview && !imagePreview.src.startsWith('data:') && imagePreview.src !== '#') {
+                imageUrlToSave = imagePreview.src; 
             }
         }
         await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, imageUrlToSave);
-        if (loadingIndicator) loadingIndicator.classList.add('hidden'); // Hide if no image upload
+        if (loadingIndicator) loadingIndicator.classList.add('hidden'); 
     }
 }
 
@@ -296,15 +280,12 @@ async function saveRecipeDataToFirestore(recipeIdToEdit, title, category, direct
 
     if (recipeIdToEdit) { 
         dataToSave.lastUpdatedAt = Timestamp.now();
-        // Only include imageUrl if it's explicitly passed (new, removed, or kept)
-        // If imageUrl is undefined, it means no new image was selected, and we don't touch existing one.
-        // This logic is handled by how imageUrl is passed from handleRecipeFormSubmit
-        if (imageUrl !== undefined) { // If imageUrl is null, it means remove. If it has a value, it's new/kept.
-            dataToSave.imageUrl = imageUrl;
+        if (imageUrl !== undefined) { 
+            dataToSave.imageUrl = imageUrl; 
         }
-    } else { // Adding new recipe
+    } else { 
         if (imageUrl) dataToSave.imageUrl = imageUrl;
-        dataToSave.userId = userId; // Essential for new recipes
+        dataToSave.userId = userId;
         dataToSave.createdAt = Timestamp.now();
     }
 
@@ -434,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("DOM_LOAD_ERROR: Critical auth UI elements missing!"); return; 
         }
         
-        initializeFirebaseAndAuth(); 
+        initializeFirebaseAndAuth(); // Changed function name
 
         if (googleSignInBtn) googleSignInBtn.addEventListener('click', handleGoogleSignIn);
         if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
@@ -469,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedImageFile = null;
                 if(recipeImageInput) recipeImageInput.value = ''; 
                 if (imagePreview && imagePreviewContainer) {
-                    imagePreview.src = '#'; // Indicate no image or removal
+                    imagePreview.src = '#'; 
                     imagePreviewContainer.classList.add('hidden');
                 }
             });
