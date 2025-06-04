@@ -1,0 +1,6 @@
+.view-hidden {
+    display: none;
+}
+.view-active {
+    display: block;
+}

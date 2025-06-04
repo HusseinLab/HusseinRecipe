@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Online Recipe Book</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css"> <!-- For .view-hidden, .view-active -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* .btn-primary can be removed if 'Add New Recipe' button is styled directly */
+        /* .category-filter-btn base structural styles can be kept if preferred, but colors will be direct */
+        /* For simplicity, we'll apply all styles directly in HTML or via JS for category buttons */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9; 
+        }
+        #categoryFilterBar::-webkit-scrollbar { height: 4px; }
+        #categoryFilterBar::-webkit-scrollbar-track { background: transparent; }
+        #categoryFilterBar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        #categoryFilterBar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg sticky top-0 z-40">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex items-center">
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">My Personal Recipe Book</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative hidden md:block"> 
+                        <label for="headerSearchInput" class="sr-only">Search</label>
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                        </div>
+                        <input id="headerSearchInput" name="search" class="block w-full bg-indigo-400 bg-opacity-25 text-white placeholder-indigo-100 border border-transparent rounded-md py-2 pl-10 pr-3 leading-5 focus:outline-none focus:bg-white focus:text-gray-900 focus:placeholder-gray-500 focus:ring-0 focus:border-transparent sm:text-sm transition-colors" placeholder="Search" type="search">
+                    </div>
+                    <p id="authStatus" class="text-sm opacity-90 whitespace-nowrap">Initializing...</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="loadingIndicator" class="hidden fixed top-0 left-0 w-full h-1 bg-yellow-400 z-50"></div>
+    <div id="successMessage" class="hidden p-3 text-sm text-white bg-green-500 rounded-lg fixed top-24 right-5 z-50 shadow-lg" role="alert"></div> 
+    <div id="errorMessage" class="hidden p-3 text-sm text-white bg-red-500 rounded-lg fixed top-24 right-5 z-50 shadow-lg" role="alert"></div>
+
+    <main id="appViews" class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div id="browseView" class="view-active">
+            <!-- This section now acts as the main content panel for the browse view -->
+            <section id="browseContentPanel" class="bg-white p-6 md:p-8 rounded-xl shadow-xl">
+                <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div class="relative flex-grow md:hidden"> 
+                        <label for="mobileSearchInput" class="sr-only">Search Recipes</label>
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                        </div>
+                        <input type="text" id="mobileSearchInput" 
+                               class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-base" 
+                               placeholder="Search recipes...">
+                    </div>
+                    <div class="w-full sm:w-auto sm:ml-auto">
+                         <button id="navigateToAddRecipeBtn" 
+                                class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors whitespace-nowrap w-full sm:w-auto">
+                            <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                            Add New Recipe
+                        </button>
+                    </div>
+                </div>
+
+                <div id="categoryFilterBar" class="mb-8 overflow-x-auto pb-3">
+                    <div class="flex space-x-3 sm:space-x-4 border-b border-slate-300 pb-3">
+                        <!-- Category buttons with base inactive styles. JS will toggle active styles. -->
+                        <button data-category="all" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">All Recipes</button>
+                        <button data-category="Salad" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Salads</button>
+                        <button data-category="Main Course" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Main Courses</button>
+                        <button data-category="Dessert" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Desserts</button>
+                        <button data-category="Appetizer" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Appetizers</button>
+                        <button data-category="Drink" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Drinks</button>
+                        <button data-category="Breakfast" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Breakfast</button>
+                        <button data-category="Other" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Other</button>
+                    </div>
+                </div>
+
+                <div id="recipesGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
+                    <p id="recipesGridPlaceholder" class="text-center text-gray-500 py-8 col-span-full">Loading recipes...</p>
+                </div>
+            </section> 
+        </div> 
+
+        <div id="recipeDetailView" class="view-hidden">
+            <section id="singleRecipeSection" class="bg-white p-6 md:p-8 rounded-xl shadow-xl mt-0 md:mt-8 max-w-3xl mx-auto">
+                <button id="navigateToBrowseBtnDetail" class="mb-6 text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center">
+                    <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                    Back to All Recipes
+                </button>
+                <div id="detailImagePlaceholder" class="h-64 bg-slate-200 rounded-lg mb-6 flex items-center justify-center text-slate-400">
+                    <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <h2 id="detailRecipeTitle" class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Recipe Title Placeholder</h2>
+                <p id="detailRecipeCategory" class="text-indigo-600 font-semibold mb-6">Category Placeholder</p>
+                <div class="space-y-6">
+                    <div id="detailRecipeTagsContainer" class="view-hidden"> 
+                        <h4 class="text-lg font-semibold text-gray-700 mb-2">Tags:</h4>
+                        <div id="detailRecipeTags" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-2">Ingredients:</h4>
+                        <ul id="detailRecipeIngredients" class="list-disc list-inside text-gray-700 ml-4 space-y-1 text-base"></ul>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-2">Directions:</h4>
+                        <ol id="detailRecipeDirections" class="list-decimal list-inside text-gray-700 ml-4 space-y-2 text-base"></ol>
+                    </div>
+                    <div id="detailRecipeNotesContainer" class="view-hidden">
+                        <h4 class="text-lg font-semibold text-gray-700 mb-2">Notes:</h4>
+                        <p id="detailRecipeNotes" class="text-gray-700 whitespace-pre-wrap text-base"></p>
+                    </div>
+                    <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row sm:space-x-3 space-y-3 sm:space-y-0">
+                        <button id="editRecipeBtn" 
+                                class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors whitespace-nowrap flex-grow sm:flex-grow-0">
+                            Edit Recipe
+                        </button>
+                        <button id="deleteRecipeBtn" 
+                                class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors whitespace-nowrap flex-grow sm:flex-grow-0">
+                            Delete Recipe
+                        </button>
+                    </div>
+                </div> 
+            </section> 
+        </div> 
+
+        <div id="recipeFormView" class="view-hidden">
+            <section id="addEditRecipeSection" class="mb-10 bg-white p-6 md:p-8 rounded-xl shadow-xl mt-0 md:mt-8 max-w-2xl mx-auto">
+                <div class="flex justify-between items-center mb-8"> 
+                    <h2 id="formTitle" class="text-2xl md:text-3xl font-bold text-gray-800">Add New Recipe</h2>
+                </div>
+                <form id="recipeForm" class="space-y-6">
+                    <div>
+                        <label for="recipeTitleInput" class="block text-sm font-semibold text-gray-700 mb-2">Recipe Title <span class="text-red-500">*</span></label>
+                        <input type="text" id="recipeTitleInput" name="recipeTitle" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" required>
+                    </div>
+                    <div>
+                        <label for="recipeCategoryInput" class="block text-sm font-semibold text-gray-700 mb-2">Category <span class="text-red-500">*</span></label>
+                        <select id="recipeCategoryInput" name="recipeCategory" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" required>
+                            <option value="">Select a category</option>
+                            <option value="Appetizer">Appetizer</option>
+                            <option value="Salad">Salad</option>
+                            <option value="Main Course">Main Course</option>
+                            <option value="Side Dish">Side Dish</option>
+                            <option value="Dessert">Dessert</option>
+                            <option value="Drink">Drink</option>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Ingredients <span class="text-red-500">*</span></label>
+                        <div class="flex items-center space-x-2 mb-3">
+                            <input type="text" id="newIngredientInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="e.g., 1 cup flour">
+                            <button type="button" id="addIngredientBtn" class="px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors whitespace-nowrap">Add</button>
+                        </div>
+                        <div id="ingredientListDisplay" class="mt-2 space-y-2"></div>
+                        <p class="text-xs text-gray-500 mt-1">Add each ingredient one by one.</p>
+                    </div>
+                    <div>
+                        <label for="recipeDirectionsInput" class="block text-sm font-semibold text-gray-700 mb-2">Directions (one step per line) <span class="text-red-500">*</span></label>
+                        <textarea id="recipeDirectionsInput" name="recipeDirections" rows="7" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors min-h-[100px]" required></textarea>
+                    </div>
+                    <div>
+                        <label for="recipeNotesInput" class="block text-sm font-semibold text-gray-700 mb-2">Notes (optional)</label>
+                        <textarea id="recipeNotesInput" name="recipeNotes" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors min-h-[100px]"></textarea>
+                    </div>
+                    <div>
+                        <label for="recipeTagsInput" class="block text-sm font-semibold text-gray-700 mb-2">Tags (comma-separated)</label>
+                        <input type="text" id="recipeTagsInput" name="recipeTags" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="e.g., lebanese, dinner, easy">
+                    </div>
+                    <input type="hidden" id="recipeIdInput">
+                    <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col-reverse md:flex-row md:justify-end md:space-x-3 space-y-3 space-y-reverse md:space-y-0">
+                        <button id="navigateToBrowseBtnForm" type="button" class="w-full md:w-auto justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">Cancel</button>
+                        <button type="submit" id="saveRecipeBtn" class="btn-primary">Save Recipe</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <footer class="text-center mt-12 py-8 border-t border-gray-200">
+        <p class="text-sm text-gray-500">&copy; <span id="currentYear"></span> Your Personal Recipe Book</p>
+    </footer>
+    
+    <script type="module" src="script.js"></script> 
+    <script>document.getElementById('currentYear').textContent = new Date().getFullYear();</script>
+</body>
+</html>
