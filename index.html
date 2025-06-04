@@ -8,9 +8,10 @@
     <link rel="stylesheet" href="style.css"> <!-- For .view-hidden, .view-active -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* .btn-primary can be removed if 'Add New Recipe' button is styled directly */
-        /* .category-filter-btn base structural styles can be kept if preferred, but colors will be direct */
-        /* For simplicity, we'll apply all styles directly in HTML or via JS for category buttons */
+        /* Base structural style for category filter buttons, colors/active state handled by JS */
+        .category-filter-btn {
+            @apply px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap;
+        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f4f7f9; 
@@ -49,7 +50,6 @@
 
     <main id="appViews" class="container mx-auto p-4 sm:p-6 lg:p-8">
         <div id="browseView" class="view-active">
-            <!-- This section now acts as the main content panel for the browse view -->
             <section id="browseContentPanel" class="bg-white p-6 md:p-8 rounded-xl shadow-xl">
                 <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div class="relative flex-grow md:hidden"> 
@@ -72,7 +72,6 @@
 
                 <div id="categoryFilterBar" class="mb-8 overflow-x-auto pb-3">
                     <div class="flex space-x-3 sm:space-x-4 border-b border-slate-300 pb-3">
-                        <!-- Category buttons with base inactive styles. JS will toggle active styles. -->
                         <button data-category="all" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">All Recipes</button>
                         <button data-category="Salad" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Salads</button>
                         <button data-category="Main Course" class="category-filter-btn px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap text-slate-700 bg-slate-200 hover:bg-indigo-100 hover:text-indigo-700">Main Courses</button>
@@ -156,6 +155,24 @@
                             <option value="Other">Other</option>
                         </select>
                     </div>
+
+                    <!-- NEW: Image Upload Field and Preview -->
+                    <div>
+                        <label for="recipeImageInput" class="block text-sm font-semibold text-gray-700 mb-2">Recipe Image (Optional)</label>
+                        <input type="file" id="recipeImageInput" name="recipeImage" accept="image/jpeg, image/png, image/webp"
+                               class="block w-full text-sm text-slate-500
+                                      file:mr-4 file:py-2 file:px-4
+                                      file:rounded-lg file:border-0
+                                      file:text-sm file:font-semibold
+                                      file:bg-indigo-50 file:text-indigo-700
+                                      hover:file:bg-indigo-100 transition-colors cursor-pointer">
+                        <div id="imagePreviewContainer" class="mt-4 hidden">
+                            <img id="imagePreview" src="#" alt="Image Preview" class="max-h-48 w-auto rounded-lg shadow-md object-contain"/>
+                            <button type="button" id="removeImageBtn" class="mt-2 text-xs text-red-600 hover:text-red-800 underline">Remove Image</button>
+                        </div>
+                    </div>
+                    <!-- End of Image Upload Field -->
+                    
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Ingredients <span class="text-red-500">*</span></label>
                         <div class="flex items-center space-x-2 mb-3">
