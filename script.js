@@ -1,4 +1,3 @@
-// script.js
 console.log("SCRIPT: script.js parsing started. Imports are next.");
 
 // Firebase SDK imports
@@ -477,18 +476,21 @@ function renderRecipes() {
                     if (recipeForm) recipeForm.reset();
                     if (recipeIdInput) recipeIdInput.value = '';
                     currentIngredientsArray = []; renderIngredientList(); 
+                    selectedImageFile = null; 
+                    if(imagePreview) imagePreview.src = '#';
+                    if(imagePreviewContainer) imagePreviewContainer.classList.add('hidden');
+                    if(recipeImageInput) recipeImageInput.value = '';
                     showView('recipeFormView');
                 });
             }
         }
-    }
 
 async function navigateToRecipeDetail(recipeId) { 
     console.log("FUNC: navigateToRecipeDetail for", recipeId); 
     currentRecipeIdInDetailView = recipeId; 
     if (!userId || !db) { return; }
     if (!detailRecipeTitle || !detailRecipeCategory || !detailRecipeTags || !detailRecipeIngredients || !detailRecipeDirections || !detailRecipeNotesContainer || !detailRecipeNotes || !document.getElementById('detailRecipeTagsContainer') || !detailImagePlaceholder) {
-        console.error("FUNC: navigateToRecipeDetail - Detail view elements not properly initialized."); return;
+        console.error("FUNC: navigateToRecipeDetail - Detail view elements not properly initialized."); return; 
     }
     detailRecipeTitle.textContent = 'Loading recipe...';
     detailRecipeCategory.textContent = '';
