@@ -225,7 +225,7 @@ async function handleRecipeFormSubmit(event) {
     event.preventDefault(); 
     if (!userId || !db) { showMessage(errorMessageDiv, "You must be logged in to save recipes.", true); return;  }
     if (!recipeTitleInput || !recipeCategoryInput || !recipeDirectionsInput || !recipeIdInput || !recipeForm || !loadingIndicator) {
-        showMessage(errorMessageDiv, "Form error or loading indicator missing. Please refresh.", true); return;
+        showMessage(errorMessageDiv, "Form error or loading indicator missing. Please refresh.", true); return; 
     }
     const titleValue = recipeTitleInput.value.trim(); 
     const categoryValue = recipeCategoryInput.value;
@@ -484,13 +484,14 @@ function renderRecipes() {
                 });
             }
         }
+    }
 
 async function navigateToRecipeDetail(recipeId) { 
     console.log("FUNC: navigateToRecipeDetail for", recipeId); 
     currentRecipeIdInDetailView = recipeId; 
     if (!userId || !db) { return; }
     if (!detailRecipeTitle || !detailRecipeCategory || !detailRecipeTags || !detailRecipeIngredients || !detailRecipeDirections || !detailRecipeNotesContainer || !detailRecipeNotes || !document.getElementById('detailRecipeTagsContainer') || !detailImagePlaceholder) {
-        console.error("FUNC: navigateToRecipeDetail - Detail view elements not properly initialized."); return; 
+        console.error("FUNC: navigateToRecipeDetail - Detail view elements not properly initialized."); return;
     }
     detailRecipeTitle.textContent = 'Loading recipe...';
     detailRecipeCategory.textContent = '';
