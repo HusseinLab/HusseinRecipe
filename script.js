@@ -556,22 +556,35 @@ try {
 async function handleDeleteRecipe() { /* ... (Keep existing function body) ... */ }
 
 function updateCategoryButtonStyles() {
+    console.log("DEBUG: updateCategoryButtonStyles - Function CALLED. Current filter:", currentCategoryFilter);
+
     if (!categoryFilterButtonsNodeList || categoryFilterButtonsNodeList.length === 0) {
-        // Attempt to re-query if not available, though it should be from DOMContentLoaded
+        console.warn("DEBUG: updateCategoryButtonStyles - NodeList empty, re-querying '.category-filter-btn'");
         categoryFilterButtonsNodeList = document.querySelectorAll('.category-filter-btn');
         if (!categoryFilterButtonsNodeList || categoryFilterButtonsNodeList.length === 0) {
-            console.warn("updateCategoryButtonStyles: No category filter buttons found even after re-query.");
+            console.warn("DEBUG: updateCategoryButtonStyles - Still no category filter buttons found after re-query.");
             return;
         }
+        console.log("DEBUG: updateCategoryButtonStyles - Found buttons after re-query:", categoryFilterButtonsNodeList.length);
+    } else {
+        // console.log("DEBUG: updateCategoryButtonStyles - Using existing NodeList with count:", categoryFilterButtonsNodeList.length);
     }
 
-    categoryFilterButtonsNodeList.forEach(button => {
-        button.classList.remove('category-filter-btn-active');
+    categoryFilterButtonsNodeList.forEach((button, index) => {
+        let isActive = false;
         if (button.dataset.category === currentCategoryFilter) {
+            isActive = true;
+        }
+
+        button.classList.remove('category-filter-btn-active');
+
+        if (isActive) {
             button.classList.add('category-filter-btn-active');
+            console.log(`DEBUG: updateCategoryButtonStyles - ADDING active class to: ${button.dataset.category} (${button.textContent.trim()})`);
         }
     });
-    // console.log("updateCategoryButtonStyles: Styles updated for current category:", currentCategoryFilter); // Optional: for debugging
+
+    console.log("DEBUG: updateCategoryButtonStyles - FINISHED processing. Styles updated for current category:", currentCategoryFilter);
 }
 
 // --- Event Listeners ---
