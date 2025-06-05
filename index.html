@@ -19,19 +19,33 @@
 
         font-family: 'Inter', sans-serif;
 
-        background-color: #f4f7f9;
+        background-color: #f4f7f9; 
 
     }
 
-    /* Base structural style for category filter buttons */
-
+    /* Base structural style for category filter buttons (Simplified for testing) */
     .category-filter-btn {
-
-        @apply px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap cursor-pointer bg-slate-200 text-slate-700 hover:bg-slate-300;
-
+        padding: 0.5rem 1rem; /* approx px-4 py-2 */
+        font-size: 0.875rem; /* text-sm */
+        font-weight: 500; /* font-medium */
+        border-radius: 0.375rem; /* rounded-md */
+        transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+        white-space: nowrap;
+        cursor: pointer;
+        background-color: #e2e8f0; /* Equivalent to a light gray like slate-200 */
+        color: #334155; /* Equivalent to a dark gray like slate-700 */
+        border: 1px solid transparent; /* Ensure border doesn't cause issues */
+    }
+    .category-filter-btn:hover {
+        background-color: #cbd5e1; /* Equivalent to slate-300 */
     }
     .category-filter-btn-active {
-        @apply bg-indigo-600 text-white hover:bg-indigo-700; /* Added hover for active state too */
+        background-color: #4f46e5; /* Equivalent to indigo-600 */
+        color: white;
+        /* No need to re-declare padding, font-size etc. if they are the same */
+    }
+    .category-filter-btn-active:hover {
+        background-color: #4338ca; /* Equivalent to indigo-700 */
     }
 
     #categoryFilterBar::-webkit-scrollbar { height: 4px; }
@@ -57,7 +71,7 @@
 
             <div class="flex items-center space-x-4">
 
-                <div class="relative hidden md:block">
+                <div class="relative hidden md:block"> 
 
                     <label for="headerSearchInput" class="sr-only">Search</label>
 
@@ -75,7 +89,7 @@
 
                     <p id="authStatus" class="opacity-90 whitespace-nowrap hidden">Initializing...</p>
 
-                    <button id="googleSignInBtn"
+                    <button id="googleSignInBtn" 
 
                             class="hidden ml-0 sm:ml-4 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-white hover:bg-indigo-50 transition-colors">
 
@@ -87,7 +101,7 @@
 
                         <span id="userName" class="font-medium text-indigo-100"></span>
 
-                        <button id="signOutBtn"
+                        <button id="signOutBtn" 
 
                                 class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-700 focus:ring-white transition-colors">
 
@@ -110,7 +124,7 @@
 
 <div id="loadingIndicator" class="hidden fixed top-0 left-0 w-full h-1 bg-yellow-400 z-50"></div>
 
-<div id="successMessage" class="hidden p-3 text-sm text-white bg-green-500 rounded-lg fixed top-24 right-5 z-50 shadow-lg" role="alert"></div>
+<div id="successMessage" class="hidden p-3 text-sm text-white bg-green-500 rounded-lg fixed top-24 right-5 z-50 shadow-lg" role="alert"></div> 
 
 <div id="errorMessage" class="hidden p-3 text-sm text-white bg-red-500 rounded-lg fixed top-24 right-5 z-50 shadow-lg" role="alert"></div>
 
@@ -125,7 +139,7 @@
 
             <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
 
-                <div class="relative flex-grow md:hidden">
+                <div class="relative flex-grow md:hidden"> 
 
                     <label for="mobileSearchInput" class="sr-only">Search Recipes</label>
 
@@ -135,9 +149,9 @@
 
                     </div>
 
-                    <input type="text" id="mobileSearchInput"
+                    <input type="text" id="mobileSearchInput" 
 
-                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-base"
+                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-base" 
 
                            placeholder="Search recipes...">
 
@@ -145,7 +159,7 @@
 
                 <div class="w-full sm:w-auto sm:ml-auto">
 
-                     <button id="navigateToAddRecipeBtn"
+                     <button id="navigateToAddRecipeBtn" 
 
                             class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors whitespace-nowrap w-full sm:w-auto">
 
@@ -191,9 +205,9 @@
 
             </div>
 
-        </section>
+        </section> 
 
-    </div>
+    </div> 
 
 
     <div id="recipeDetailView" class="view-hidden">
@@ -220,7 +234,7 @@
 
             <div class="space-y-6">
 
-                <div id="detailRecipeTagsContainer" class="view-hidden">
+                <div id="detailRecipeTagsContainer" class="view-hidden"> 
 
                     <h4 class="text-lg font-semibold text-gray-700 mb-2">Tags:</h4>
 
@@ -254,7 +268,7 @@
 
                 <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row sm:space-x-3 space-y-3 sm:space-y-0">
 
-                    <button id="editRecipeBtn"
+                    <button id="editRecipeBtn" 
 
                             class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors whitespace-nowrap flex-grow sm:flex-grow-0">
 
@@ -262,7 +276,7 @@
 
                     </button>
 
-                    <button id="deleteRecipeBtn"
+                    <button id="deleteRecipeBtn" 
 
                             class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors whitespace-nowrap flex-grow sm:flex-grow-0">
 
@@ -272,18 +286,18 @@
 
                 </div>
 
-            </div>
+            </div> 
 
-        </section>
+        </section> 
 
-    </div>
+    </div> 
 
 
     <div id="recipeFormView" class="view-hidden">
 
         <section id="addEditRecipeSection" class="mb-10 bg-white p-6 md:p-8 rounded-xl shadow-xl mt-0 md:mt-8 max-w-2xl mx-auto">
 
-            <div class="flex justify-between items-center mb-8">
+            <div class="flex justify-between items-center mb-8"> 
 
                 <h2 id="formTitle" class="text-2xl md:text-3xl font-bold text-gray-800">Add New Recipe</h2>
 
@@ -403,7 +417,7 @@
 
                     <button id="navigateToBrowseBtnForm" type="button" class="w-full md:w-auto justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">Cancel</button>
 
-                    <button type="submit" id="saveRecipeBtn"
+                    <button type="submit" id="saveRecipeBtn" 
 
                             class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors whitespace-nowrap w-full md:w-auto">
 
@@ -430,7 +444,7 @@
 
 
 
-<script type="module" src="script.js"></script>
+<script type="module" src="script.js"></script> 
 
 <script>document.getElementById('currentYear').textContent = new Date().getFullYear();</script>
 </body>
