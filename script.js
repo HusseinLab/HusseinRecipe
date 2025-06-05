@@ -484,14 +484,13 @@ function renderRecipes() {
                 });
             }
         }
-    }
 
 async function navigateToRecipeDetail(recipeId) { 
     console.log("FUNC: navigateToRecipeDetail for", recipeId); 
     currentRecipeIdInDetailView = recipeId; 
     if (!userId || !db) { return; }
     if (!detailRecipeTitle || !detailRecipeCategory || !detailRecipeTags || !detailRecipeIngredients || !detailRecipeDirections || !detailRecipeNotesContainer || !detailRecipeNotes || !document.getElementById('detailRecipeTagsContainer') || !detailImagePlaceholder) {
-        console.error("FUNC: navigateToRecipeDetail - Detail view elements not properly initialized."); return;
+        console.error("FUNC: navigateToRecipeDetail - Detail view elements not properly initialized."); return; 
     }
     detailRecipeTitle.textContent = 'Loading recipe...';
     detailRecipeCategory.textContent = '';
@@ -549,8 +548,36 @@ async function navigateToRecipeDetail(recipeId) {
     }
 }
 
-async function handleDeleteRecipe() { /* ... (Keep existing function body) ... */ }
-function updateCategoryButtonStyles() { /* ... (Keep existing function body) ... */ }
+async function handleDeleteRecipe() { 
+    if (!userId || !db || !currentRecipeIdInDetailView) { 
+        showMessage(errorMessageDiv, "No recipe selected to delete.", true); 
+        return; 
+    }
+    const confirmDelete = confirm("Are you sure you want to delete this recipe?");
+    if (confirmDelete) {
+        try {
+            const recipeDocRef = doc(db, `artifacts/${appId}/users/${userId}/recipes`, currentRecipeIdInDetailView);
+            await deleteDoc(recipeDocRef);
+            showMessage(successMessageDiv, "Recipe deleted successfully!");
+            currentRecipeIdInDetailView = null; 
+            showView('browseView'); 
+        } catch (error) {
+            console.error("Error deleting recipe: ", error);
+            showMessage(errorMessageDiv, `Error deleting recipe: ${error.message}`, true);
+        }
+    }
+}
+
+function updateCategoryButtonStyles() {
+    if (!categoryFilterButtonsNodeList) return;
+    categoryFilterButtonsNodeList.forEach(button => {
+        if (button.dataset.category === currentCategoryFilter) {
+            button.classList.add('active-category-btn');
+        } else {
+            button.classList.remove('active-category-btn');
+        }
+    });
+}
 
 
 // --- Event Listeners ---
