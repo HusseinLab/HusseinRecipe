@@ -14,7 +14,7 @@
         }
         /* Base structural style for category filter buttons - JS will handle all visual styles */
         .category-filter-btn {
-            @apply px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap;
+            @apply px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out whitespace-nowrap cursor-pointer;
         }
         #categoryFilterBar::-webkit-scrollbar { height: 4px; }
         #categoryFilterBar::-webkit-scrollbar-track { background: transparent; }
@@ -46,9 +46,8 @@
                         </button>
                         <div id="userInfo" class="hidden items-center space-x-3">
                             <span id="userName" class="font-medium text-indigo-100"></span>
-  
                             <button id="signOutBtn" 
-                                    class="px-3 py-1.5 border border-indigo-400 text-xs font-medium rounded-md text-indigo-100 bg-white bg-opacity-10 hover:bg-opacity-25 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition-colors">
+                                    class="px-3 py-1.5 border border-indigo-300 text-xs font-medium rounded-md text-indigo-100 bg-white bg-opacity-10 hover:bg-opacity-25 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white transition-colors">
                                 Sign Out
                             </button>
                         </div>
@@ -64,6 +63,7 @@
 
     <main id="appViews" class="container mx-auto p-4 sm:p-6 lg:p-8">
         <div id="browseView" class="view-active">
+            <!-- Main content panel for the browse view -->
             <section id="browseContentPanel" class="bg-white p-6 md:p-8 rounded-xl shadow-xl">
                 <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div class="relative flex-grow md:hidden"> 
@@ -86,8 +86,6 @@
 
                 <div id="categoryFilterBar" class="mb-8 overflow-x-auto pb-3">
                     <div class="flex space-x-3 sm:space-x-4 border-b border-slate-300 pb-3">
-                        <!-- Buttons now only have data-category and the base .category-filter-btn class -->
-                        <!-- All visual styles (active/inactive) will be fully managed by JavaScript -->
                         <button data-category="all" class="category-filter-btn">All Recipes</button>
                         <button data-category="Salad" class="category-filter-btn">Salads</button>
                         <button data-category="Main Course" class="category-filter-btn">Main Courses</button>
