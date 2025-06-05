@@ -775,4 +775,4 @@ try {
 }
 });
 
-console.log("SCRIPT: script.js parsing
+console.log("SCRIPT: script.js parsing finished.");
