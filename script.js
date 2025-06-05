@@ -413,83 +413,85 @@ if (!recipesUnsubscribe) {
 }
 
 function renderRecipes() {
-const querySnapshot = window.lastRecipeSnapshot;
-console.log("FUNC: renderRecipes. UserID:", userId, "Snapshot available:", !!querySnapshot);
+    const querySnapshot = window.lastRecipeSnapshot;
+    console.log("FUNC: renderRecipes. UserID:", userId, "Snapshot available:", !!querySnapshot);
 
-if (!recipesGridContainer || !recipesGridPlaceholder) {
-    console.error("FUNC: renderRecipes - recipesGridContainer or recipesGridPlaceholder is null!"); return;
-}
-if (!querySnapshot && userId) {
-    recipesGridContainer.innerHTML = '';
-    recipesGridPlaceholder.textContent = 'Loading recipes...';
-    recipesGridPlaceholder.style.display = 'block';
-    return;
-}
-if(!userId) {
-    recipesGridContainer.innerHTML = '';
-    recipesGridPlaceholder.textContent = 'Please sign in to see recipes.';
-    recipesGridPlaceholder.style.display = 'block';
-    return;
-}
-
-recipesGridContainer.innerHTML = '';
-let currentSearchTerm = "";
-if (headerSearchInput && headerSearchInput.value) { currentSearchTerm = headerSearchInput.value.toLowerCase().trim(); }
-else if (mobileSearchInput && mobileSearchInput.value) { currentSearchTerm = mobileSearchInput.value.toLowerCase().trim(); }
-
-let recipesFound = 0;
-querySnapshot.forEach((docSnap) => {
-    const recipe = docSnap.data();
-    const recipeId = docSnap.id;
-    if (currentCategoryFilter !== 'all' && recipe.category !== currentCategoryFilter) return;
-    let match = (currentSearchTerm === "") ||
-                (recipe.title && recipe.title.toLowerCase().includes(currentSearchTerm)) ||
-                (recipe.category && recipe.category.toLowerCase().includes(currentSearchTerm)) ||
-                (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(currentSearchTerm)));
-    if (match) {
-        recipesFound++;
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300 ease-in-out cursor-pointer flex flex-col group';
-        card.setAttribute('data-id', recipeId);
-        card.addEventListener('click', () => navigateToRecipeDetail(recipeId));
-
-        const imageDiv = document.createElement('div'); // Changed variable name for clarity
-        imageDiv.className = 'h-48 w-full bg-slate-200 flex items-center justify-center text-slate-400 text-sm relative overflow-hidden group-hover:shadow-inner';
-        if (recipe.imageUrl) {
-            imageDiv.innerHTML = `<img src="${recipe.imageUrl}" alt="${recipe.title}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110">`;
-        } else {
-            imageDiv.innerHTML = `<svg class="w-12 h-12 text-slate-300 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`;
-        }
-        imageDiv.innerHTML += `<div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity duration-300"></div>`;
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'p-5 flex-grow flex flex-col';
-        let tagsHTML = (recipe.tags && recipe.tags.length > 0) ? `<div class="mt-3 flex flex-wrap gap-2">${recipe.tags.map(tag => `<span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">${tag}</span>`).join('')}</div>` : '';
-        let ingredientsSnippet = (recipe.ingredients && recipe.ingredients.length > 0) ? `<ul class="text-xs text-gray-600 mt-2 mb-3 space-y-0.5">${recipe.ingredients.slice(0, 3).map(ing => `<li>- ${ing.length > 30 ? ing.substring(0,27)+'...' : ing}</li>`).join('')}${recipe.ingredients.length > 3 ? '<li class="text-gray-400">...more</li>' : ''}</ul>` : '';
-        contentDiv.innerHTML = `<div><p class="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-1">${recipe.category}</p><h3 class="text-xl font-bold text-gray-800 mb-2 leading-tight group-hover:text-indigo-600 transition-colors">${recipe.title}</h3>${ingredientsSnippet}</div><div class="mt-auto pt-2"> ${tagsHTML}</div>`;
-
-        card.appendChild(imageDiv);
-        card.appendChild(contentDiv);
-        recipesGridContainer.appendChild(card);
+    if (!recipesGridContainer || !recipesGridPlaceholder) {
+        console.error("FUNC: renderRecipes - recipesGridContainer or recipesGridPlaceholder is null!");
+        return;
     }
-});
-recipesGridPlaceholder.style.display = recipesFound > 0 ? 'none' : 'block';
-if (recipesFound === 0) {
-    recipesGridPlaceholder.innerHTML = (currentSearchTerm !== "" || currentCategoryFilter !== 'all') ? `<p class="text-center text-gray-500 py-8 col-span-full">No recipes found matching your criteria.</p>` :
-         `<div class="text-center py-10 col-span-full"><svg class="mx-auto h-16 w-16 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg><h3 class="mt-4 text-lg font-semibold text-gray-800">No recipes yet!</h3><p class="mt-2 text-sm text-gray-500">Time to add your culinary masterpieces.</p><div class="mt-6"><button type="button" id="emptyStateAddRecipeBtnGrid" class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors whitespace-nowrap w-full sm:w-auto"><svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>Add Your First Recipe</button></div></div>`;
-        const emptyStateBtn = document.getElementById('emptyStateAddRecipeBtnGrid');
-        if(emptyStateBtn && !emptyStateBtn.getAttribute('listenerAttached')) {
-            emptyStateBtn.setAttribute('listenerAttached', 'true');
-            emptyStateBtn.addEventListener('click', () => {
-                if (formTitle) formTitle.textContent = 'Add New Recipe';
-                if (recipeForm) recipeForm.reset();
-                if (recipeIdInput) recipeIdInput.value = '';
-                currentIngredientsArray = []; renderIngredientList();
-                showView('recipeFormView');
-            });
-        }
+    if (!querySnapshot && userId) {
+        recipesGridContainer.innerHTML = '';
+        recipesGridPlaceholder.textContent = 'Loading recipes...';
+        recipesGridPlaceholder.style.display = 'block';
+        return;
     }
+    if (!userId) {
+        recipesGridContainer.innerHTML = '';
+        recipesGridPlaceholder.textContent = 'Please sign in to see recipes.';
+        recipesGridPlaceholder.style.display = 'block';
+        return;
+    }
+
+    recipesGridContainer.innerHTML = '';
+    let currentSearchTerm = "";
+    if (headerSearchInput && headerSearchInput.value) { currentSearchTerm = headerSearchInput.value.toLowerCase().trim(); }
+    else if (mobileSearchInput && mobileSearchInput.value) { currentSearchTerm = mobileSearchInput.value.toLowerCase().trim(); }
+
+    let recipesFound = 0;
+    querySnapshot.forEach((docSnap) => {
+        const recipe = docSnap.data();
+        const recipeId = docSnap.id;
+        if (currentCategoryFilter !== 'all' && recipe.category !== currentCategoryFilter) return;
+        let match = (currentSearchTerm === "") ||
+            (recipe.title && recipe.title.toLowerCase().includes(currentSearchTerm)) ||
+            (recipe.category && recipe.category.toLowerCase().includes(currentSearchTerm)) ||
+            (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(currentSearchTerm)));
+        if (match) {
+            recipesFound++;
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300 ease-in-out cursor-pointer flex flex-col group';
+            card.setAttribute('data-id', recipeId);
+            card.addEventListener('click', () => navigateToRecipeDetail(recipeId));
+
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'h-48 w-full bg-slate-200 flex items-center justify-center text-slate-400 text-sm relative overflow-hidden group-hover:shadow-inner';
+            if (recipe.imageUrl) {
+                imageDiv.innerHTML = `<img src="${recipe.imageUrl}" alt="${recipe.title}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110">`;
+            } else {
+                imageDiv.innerHTML = `<svg class="w-12 h-12 text-slate-300 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`;
+            }
+            imageDiv.innerHTML += `<div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity duration-300"></div>`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'p-5 flex-grow flex flex-col';
+            let tagsHTML = (recipe.tags && recipe.tags.length > 0) ? `<div class="mt-3 flex flex-wrap gap-2">${recipe.tags.map(tag => `<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">${tag}</span>`).join('')}</div>` : '';
+            let ingredientsSnippet = (recipe.ingredients && recipe.ingredients.length > 0) ? `<ul class="text-xs text-gray-600 mt-2 mb-3 space-y-0.5">${recipe.ingredients.slice(0, 3).map(ing => `<li>- ${ing.length > 30 ? ing.substring(0,27)+'...' : ing}</li>`).join('')}${recipe.ingredients.length > 3 ? '<li class="text-gray-400">...more</li>' : ''}</ul>` : '';
+            contentDiv.innerHTML = `<div><p class="text-xs font-semibold text-orange-500 uppercase tracking-wider mb-1">${recipe.category}</p><h3 class="text-xl font-bold text-gray-800 mb-2 leading-tight group-hover:text-orange-600 transition-colors">${recipe.title}</h3>${ingredientsSnippet}</div><div class="mt-auto pt-2"> ${tagsHTML}</div>`;
+
+            card.appendChild(imageDiv);
+            card.appendChild(contentDiv);
+            recipesGridContainer.appendChild(card);
+        }
+    });
+    recipesGridPlaceholder.style.display = recipesFound > 0 ? 'none' : 'block';
+    if (recipesFound === 0) {
+        recipesGridPlaceholder.innerHTML = (currentSearchTerm !== "" || currentCategoryFilter !== 'all') ? `<p class="text-center text-gray-500 py-8 col-span-full">No recipes found matching your criteria.</p>` :
+             `<div class="text-center py-10 col-span-full"><svg class="mx-auto h-16 w-16 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg><h3 class="mt-4 text-lg font-semibold text-gray-800">No recipes yet!</h3><p class="mt-2 text-sm text-gray-500">Time to add your culinary masterpieces.</p><div class="mt-6"><button type="button" id="emptyStateAddRecipeBtnGrid" class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors whitespace-nowrap w-full sm:w-auto"><svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>Add Your First Recipe</button></div></div>`;
+            const emptyStateBtn = document.getElementById('emptyStateAddRecipeBtnGrid');
+            if(emptyStateBtn && !emptyStateBtn.getAttribute('listenerAttached')) {
+                emptyStateBtn.setAttribute('listenerAttached', 'true');
+                emptyStateBtn.addEventListener('click', () => {
+                    if (formTitle) formTitle.textContent = 'Add New Recipe';
+                    if (recipeForm) recipeForm.reset();
+                    if (recipeIdInput) recipeIdInput.value = '';
+                    currentIngredientsArray = []; renderIngredientList();
+                    showView('recipeFormView');
+                });
+            }
+        }
 }
+
 async function navigateToRecipeDetail(recipeId) {
 console.log("FUNC: navigateToRecipeDetail for", recipeId);
 currentRecipeIdInDetailView = recipeId;
