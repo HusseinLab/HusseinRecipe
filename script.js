@@ -14,15 +14,14 @@ import {
     getFirestore,
     collection, query, orderBy, onSnapshot,
     doc, getDoc, addDoc, updateDoc, deleteDoc,
-    Timestamp,
-    FieldValue // Import FieldValue for deleting fields
+    Timestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import {
     getStorage,
     ref as storageRef,
     uploadBytesResumable,
     getDownloadURL,
-    deleteObject // NEW: Import for deleting images
+    deleteObject // Import for deleting images
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 console.log("SCRIPT: Firebase SDKs import statements processed.");
@@ -36,7 +35,7 @@ window.lastRecipeSnapshot = null;
 let currentIngredientsArray = [];
 let currentCategoryFilter = 'all';
 let selectedImageFile = null;
-let existingImageUrl = null; // NEW: To track the image URL when editing
+let existingImageUrl = null; // To track the image URL when editing
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-recipe-app-id';
 const firebaseConfig = {
@@ -50,7 +49,6 @@ const firebaseConfig = {
 };
 
 // --- UI Elements ---
-// (Variables are declared but assigned in DOMContentLoaded)
 let authStatusDiv, googleSignInBtn, userInfoDiv, userNameSpan, signOutBtn, navigateToAddRecipeBtn, navigateToBrowseBtnDetail, navigateToBrowseBtnForm;
 let recipeForm, recipeTitleInput, recipeCategoryInput, recipeImageInput, imagePreviewContainer, imagePreview, removeImageBtn, recipeDirectionsInput, recipeNotesInput, recipeTagsInput, formTitle, recipeIdInput;
 let newIngredientInput, addIngredientBtn, ingredientListDisplay;
@@ -62,12 +60,71 @@ let editRecipeBtn, deleteRecipeBtn;
 const views = ['browseView', 'recipeDetailView', 'recipeFormView'];
 
 // --- Functions ---
-function showView(viewIdToShow) { /* ... Your existing working function ... */ }
-function showMessage(element, message, isError = false, duration = 3000) { /* ... Your existing working function ... */ }
-async function initializeFirebaseAndAuth() { /* ... Your existing working function ... */ }
-async function handleGoogleSignIn() { /* ... Your existing working function ... */ }
-async function handleSignOut() { /* ... Your existing working function ... */ }
-function renderIngredientList() { /* ... Your existing working function ... */ }
+function showView(viewIdToShow) {
+    views.forEach(viewId => {
+        const viewElement = document.getElementById(viewId);
+        if (viewElement) {
+            viewElement.classList.toggle('view-active', viewId === viewIdToShow);
+            viewElement.classList.toggle('view-hidden', viewId !== viewIdToShow);
+        }
+    });
+    if (viewIdToShow === 'browseView' && typeof loadBrowseViewRecipes === 'function') {
+        loadBrowseViewRecipes();
+    }
+}
+function showMessage(element, message, isError = false, duration = 3000) {
+    if (!element) return;
+    element.textContent = message;
+    element.className = 'p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg';
+    element.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
+    element.classList.remove('hidden');
+    setTimeout(() => element.classList.add('hidden'), duration);
+}
+async function initializeFirebaseAndAuth() {
+    try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        storage = getStorage(app);
+        console.log("DEBUG_INIT: Firebase core services initialized.");
+        onAuthStateChanged(auth, handleAuthStateChange);
+    } catch (error) {
+        console.error("CRITICAL ERROR in initializeFirebaseAndAuth:", error);
+        if (authStatusDiv) authStatusDiv.textContent = "Init Error!";
+    }
+}
+async function handleAuthStateChange(user) {
+    if (user) {
+        userId = user.uid;
+        console.log("AUTH: Signed In. UID:", userId, "Name:", user.displayName);
+        updateAuthUI(user);
+        loadBrowseViewRecipes();
+    } else {
+        userId = null;
+        console.log("AUTH: Signed Out.");
+        updateAuthUI(null);
+        if (recipesUnsubscribe) recipesUnsubscribe();
+        renderRecipes(); // Render empty state
+    }
+}
+function updateAuthUI(user) {
+    if (user) {
+        authStatusDiv.classList.add('hidden');
+        googleSignInBtn.classList.add('hidden');
+        userInfoDiv.classList.remove('hidden');
+        userInfoDiv.classList.add('flex');
+        userNameSpan.textContent = user.displayName || user.email || "User";
+    } else {
+        authStatusDiv.classList.add('hidden');
+        googleSignInBtn.classList.remove('hidden');
+        userInfoDiv.classList.add('hidden');
+        userInfoDiv.classList.remove('flex');
+        userNameSpan.textContent = '';
+    }
+}
+async function handleGoogleSignIn() { /* ... (Your working implementation) ... */ }
+async function handleSignOut() { /* ... (Your working implementation) ... */ }
+function renderIngredientList() { /* ... (Your working implementation) ... */ }
 
 // CORRECTED: Image upload and recipe save logic
 async function handleRecipeFormSubmit(event) {
@@ -90,30 +147,40 @@ async function handleRecipeFormSubmit(event) {
     loadingIndicator.style.width = '10%';
 
     try {
-        let finalImageUrl = existingImageUrl; // Start with the URL that was there when the form loaded
+        let finalImageUrl = existingImageUrl; // Keep existing image by default
 
-        // Scenario 1: User selected a new image to upload.
         if (selectedImageFile) {
-            console.log("New image selected, starting upload...");
+            // New image selected, perform upload
             const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`;
             const storageRefPath = `recipe_images/${userId}/${imageName}`;
             const imageStorageRefInstance = storageRef(storage, storageRefPath);
             
             const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
-            
-            // This is a simplified await for the upload to complete.
-            // For progress bar, we would use the more complex uploadTask.on() observer.
-            await uploadTask; 
-            
-            finalImageUrl = await getDownloadURL(imageStorageRefInstance);
-            console.log("Image upload complete. New URL:", finalImageUrl);
-        } else if (imagePreview.src.includes('#') || imagePreview.src === '') {
-            // Scenario 2: User explicitly removed an existing image.
+
+            // Wait for the upload to complete to get the download URL
+            await new Promise((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        loadingIndicator.style.width = progress + '%';
+                    },
+                    (error) => {
+                        console.error("Upload failed:", error);
+                        reject(error);
+                    },
+                    async () => {
+                        finalImageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        console.log('File available at:', finalImageUrl);
+                        resolve();
+                    }
+                );
+            });
+        } else if (imagePreview && (imagePreview.src.includes('#') || imagePreview.src === '')) {
+            // User removed the existing image
             finalImageUrl = null;
         }
-        // Scenario 3 (implicit): No new file and existing image preview is still there.
-        // `finalImageUrl` already holds the `existingImageUrl`, so no action needed.
 
+        // Now that the image handling is complete, save all data to Firestore
         await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, finalImageUrl);
 
     } catch (error) {
@@ -133,31 +200,30 @@ async function saveRecipeDataToFirestore(recipeIdToEdit, title, category, direct
         notes,
         tags: tags.split(',').map(s => s.trim()).filter(s => s),
     };
+
+    const recipesCollectionPath = `artifacts/${appId}/users/${userId}/recipes`;
     
-    if (recipeIdToEdit) { // Editing existing recipe
+    if (recipeIdToEdit) {
         const dataToUpdate = { ...recipeData, lastUpdatedAt: Timestamp.now() };
-        if (imageUrl !== undefined) { 
-            dataToUpdate.imageUrl = imageUrl; 
+        if (imageUrl !== undefined) { // Update image URL only if a decision was made (new, removed, or kept)
+            dataToUpdate.imageUrl = imageUrl;
         }
-        await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/recipes`, recipeIdToEdit), dataToUpdate);
+        await updateDoc(doc(db, recipesCollectionPath, recipeIdToEdit), dataToUpdate);
         showMessage(successMessageDiv, "Recipe updated successfully!");
-    } else { // Adding new recipe
+    } else {
         const dataToSave = { ...recipeData, userId, createdAt: Timestamp.now() };
         if (imageUrl) {
             dataToSave.imageUrl = imageUrl;
         }
-        await addDoc(collection(db, `artifacts/${appId}/users/${userId}/recipes`), dataToSave);
+        await addDoc(collection(db, recipesCollectionPath), dataToSave);
         showMessage(successMessageDiv, "Recipe added successfully!");
     }
     
-    // Reset form and go back to browse view
+    // Reset form and UI state
     if(recipeForm) recipeForm.reset(); 
-    currentIngredientsArray = []; 
-    renderIngredientList(); 
-    recipeIdInput.value = ''; 
-    currentRecipeIdInDetailView = null; 
-    selectedImageFile = null; 
-    existingImageUrl = null;
+    currentIngredientsArray = []; renderIngredientList(); 
+    recipeIdInput.value = ''; currentRecipeIdInDetailView = null; 
+    selectedImageFile = null; existingImageUrl = null;
     if(imagePreview) imagePreview.src = '#';
     if(imagePreviewContainer) imagePreviewContainer.classList.add('hidden');
     if(recipeImageInput) recipeImageInput.value = '';
@@ -165,31 +231,11 @@ async function saveRecipeDataToFirestore(recipeIdToEdit, title, category, direct
     showView('browseView');
 }
 
-async function populateFormForEdit(recipeId) { /* ... (Your working implementation, with one addition) ... */
-    selectedImageFile = null; // Reset any lingering file selection
-    existingImageUrl = null;  // Reset existing image URL tracker
-    // ... rest of your function ...
-    if (docSnap.exists()) {
-        const recipe = docSnap.data();
-        // ... all your field population ...
-        if (recipe.imageUrl) {
-            existingImageUrl = recipe.imageUrl; // IMPORTANT: Store the existing URL
-            imagePreview.src = recipe.imageUrl;
-            imagePreviewContainer.classList.remove('hidden');
-        } else {
-            imagePreviewContainer.classList.add('hidden');
-            imagePreview.src = '#';
-        }
-        // ... rest of your function ...
-    }
-}
-
-// --- Recipe Display and Filtering ---
+async function populateFormForEdit(recipeId) { /* ... (Your working implementation with existingImageUrl set) ... */ }
 function loadBrowseViewRecipes() { /* ... (Your working implementation) ... */ }
 function renderRecipes() { /* ... (Your working implementation) ... */ }
 async function navigateToRecipeDetail(recipeId) { /* ... (Your working implementation) ... */ }
 function updateCategoryButtonStyles() { /* ... (Your working implementation) ... */ }
-
 
 // CORRECTED: This function now deletes from Storage and Firestore
 async function handleDeleteRecipe() { 
@@ -206,22 +252,23 @@ async function handleDeleteRecipe() {
 
             if (docSnap.exists()) {
                 const recipeData = docSnap.data();
-                // Check if there's an image to delete from Storage
                 if (recipeData.imageUrl) {
                     console.log("Recipe has an image, attempting to delete from Storage...");
                     try {
-                        const imageRef = storageRef(storage, recipeData.imageUrl); // Get ref from URL
+                        const imageRef = storageRef(storage, recipeData.imageUrl);
                         await deleteObject(imageRef);
                         console.log("Image deleted successfully from Storage.");
                     } catch (storageError) {
-                        console.error("Error deleting image from Storage:", storageError);
-                        // Decide if you want to stop the whole process if image delete fails.
-                        // For now, we'll log the error and continue to delete the Firestore doc.
-                        showMessage(errorMessageDiv, `Could not delete recipe image, but deleting recipe data. Error: ${storageError.code}`, true);
+                        if (storageError.code !== 'storage/object-not-found') {
+                            console.error("Error deleting image from Storage:", storageError);
+                            showMessage(errorMessageDiv, `Could not delete recipe image. Please try deleting the recipe again.`, true);
+                            return; // Stop if image delete fails for a reason other than not found
+                        } else {
+                            console.warn("Image not found in storage, proceeding to delete Firestore doc.");
+                        }
                     }
                 }
 
-                // Delete the recipe document from Firestore
                 await deleteDoc(recipeDocRef);
                 showMessage(successMessageDiv, `Recipe "${recipeNameToDelete}" deleted successfully.`);
                 
@@ -237,7 +284,6 @@ async function handleDeleteRecipe() {
         }
     }
 }
-
 
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => { /* ... (Your working implementation) ... */ });
