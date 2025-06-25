@@ -5,6 +5,7 @@ import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addD
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 // The rest of the application logic is wrapped in DOMContentLoaded
+// to ensure the HTML page is fully loaded before we try to find elements.
 document.addEventListener('DOMContentLoaded', () => {
 
     console.log("SCRIPT: DOMContentLoaded - Event fired. Initializing application.");
@@ -73,9 +74,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailImagePlaceholder = document.getElementById('detailImagePlaceholder');
     const editRecipeBtn = document.getElementById('editRecipeBtn');
     const deleteRecipeBtn = document.getElementById('deleteRecipeBtn');
+    const saveRecipeBtn = document.getElementById('saveRecipeBtn');
+    const saveBtnSpinner = document.getElementById('saveBtnSpinner');
+    const saveBtnText = document.getElementById('saveBtnText');
     const views = ['browseView', 'recipeDetailView', 'recipeFormView'];
 
     // --- FUNCTION DEFINITIONS ---
+
+    function setSaveButtonLoading(isLoading) {
+        if (isLoading) {
+            saveRecipeBtn.disabled = true;
+            saveBtnSpinner.classList.remove('hidden');
+            saveBtnText.textContent = 'Saving...';
+        } else {
+            saveRecipeBtn.disabled = false;
+            saveBtnSpinner.classList.add('hidden');
+            saveBtnText.textContent = 'Save Recipe';
+        }
+    }
 
     function showView(viewIdToShow) {
         views.forEach(viewId => {
@@ -95,8 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isError && error) console.error(`User Message: "${userMessage}" \nDetailed Error:`, error);
         
         element.textContent = userMessage;
-        element.classList.remove('hidden');
         element.className = `p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+        element.classList.remove('hidden');
         
         setTimeout(() => {
             element.classList.add('hidden');
@@ -274,8 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showMessage(errorMessageDiv, getFriendlyFirebaseErrorMessage(error), true, error);
         }
     }
-
-    // FIX: This is the complete, correct version of the function.
+    
     async function populateFormForEdit(recipeId) {
         if (!userId) return;
         try {
@@ -283,11 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const docSnap = await getDoc(recipeDocRef);
             if (docSnap.exists()) {
                 const recipe = docSnap.data();
-                
-                // Reset form to clear any previous state
                 resetRecipeForm();
-
-                // Populate all fields
                 recipeTitleInput.value = recipe.title || '';
                 recipeCategoryInput.value = recipe.category || '';
                 currentIngredientsArray = [...(recipe.ingredients || [])];
@@ -295,17 +306,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 recipeDirectionsInput.value = (recipe.directions || []).join('\n');
                 recipeNotesInput.value = recipe.notes || '';
                 recipeTagsInput.value = (recipe.tags || []).join(', ');
-                
-                // Set the hidden input to the recipe's ID for editing
                 recipeIdInput.value = recipeId; 
                 formTitle.textContent = 'Edit Recipe';
-
-                // Handle the existing image
                 if (recipe.imageUrl) {
                     imagePreview.src = recipe.imageUrl;
                     imagePreviewContainer.classList.remove('hidden');
                 }
-                
                 showView('recipeFormView');
             } else {
                 showMessage(errorMessageDiv, "Recipe data not found for editing.", true);
@@ -316,11 +322,95 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleRecipeFormSubmit(event) {
-        // This function should be complete from previous steps
+        event.preventDefault();
+        if (!userId) {
+            showMessage(errorMessageDiv, "You must be logged in to save recipes.", true);
+            return;
+        }
+
+        const titleValue = recipeTitleInput.value.trim();
+        const categoryValue = recipeCategoryInput.value;
+        const directionsText = recipeDirectionsInput.value.trim();
+        const recipeIdToEdit = recipeIdInput.value;
+
+        if (!titleValue || !categoryValue || currentIngredientsArray.length === 0 || !directionsText) {
+            showMessage(errorMessageDiv, "Title, Category, at least one Ingredient, and Directions are required.", true);
+            return;
+        }
+
+        setSaveButtonLoading(true);
+        loadingIndicator.classList.remove('hidden');
+        loadingIndicator.style.width = '0%';
+
+        const notesValue = recipeNotesInput.value.trim();
+        const tagsText = recipeTagsInput.value.trim();
+
+        try {
+            if (selectedImageFile) {
+                const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`;
+                const storageRefPath = `recipe_images/${userId}/${imageName}`;
+                const imageStorageRefInstance = storageRef(storage, storageRefPath);
+                const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
+
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        loadingIndicator.style.width = progress + '%';
+                    },
+                    async (error) => {
+                        throw error;
+                    },
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, downloadURL);
+                    }
+                );
+            } else {
+                let imageUrlToSave = undefined;
+                if (recipeIdToEdit) {
+                    imageUrlToSave = (imagePreview.src && imagePreview.src.startsWith('http')) ? imagePreview.src : null;
+                }
+                await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, imageUrlToSave);
+            }
+        } catch (error) {
+            const userMessage = getFriendlyFirebaseErrorMessage(error);
+            showMessage(errorMessageDiv, userMessage, true, error);
+            setSaveButtonLoading(false);
+            loadingIndicator.classList.add('hidden');
+        }
     }
     
     async function saveRecipeDataToFirestore(recipeIdToEdit, title, category, directions, notes, tags, imageUrl) {
-        // This function should be complete from previous steps
+        const recipeData = {
+            title, category,
+            ingredients: [...currentIngredientsArray],
+            directions: directions.split('\n').map(s => s.trim()).filter(Boolean),
+            notes,
+            tags: tags.split(',').map(s => s.trim()).filter(Boolean),
+        };
+
+        try {
+            const recipesCol = collection(db, `artifacts/${appId}/users/${userId}/recipes`);
+            if (recipeIdToEdit) {
+                const dataToUpdate = { ...recipeData, lastUpdatedAt: Timestamp.now() };
+                if (imageUrl !== undefined) dataToUpdate.imageUrl = imageUrl;
+                await updateDoc(doc(recipesCol, recipeIdToEdit), dataToUpdate);
+                showMessage(successMessageDiv, "Recipe updated successfully!");
+            } else {
+                const dataToAdd = { ...recipeData, userId, createdAt: Timestamp.now() };
+                if (imageUrl) dataToAdd.imageUrl = imageUrl;
+                await addDoc(recipesCol, dataToAdd);
+                showMessage(successMessageDiv, "Recipe added successfully!");
+            }
+            
+            resetRecipeForm();
+            showView('browseView');
+        } catch (error) {
+            throw error;
+        } finally {
+            setSaveButtonLoading(false);
+            loadingIndicator.classList.add('hidden');
+        }
     }
     
     async function handleDeleteRecipe() {
@@ -383,14 +473,13 @@ document.addEventListener('DOMContentLoaded', () => {
              resetRecipeForm();
              showView('browseView');
         });
-
-        // FIX: The event listener for the edit button was missing.
+        
+        recipeForm.addEventListener('submit', handleRecipeFormSubmit);
         editRecipeBtn.addEventListener('click', () => {
             if (currentRecipeIdInDetailView) {
                 populateFormForEdit(currentRecipeIdInDetailView);
             }
         });
-        
         deleteRecipeBtn.addEventListener('click', handleDeleteRecipe);
         
         const syncSearchAndRender = (event) => {
@@ -412,7 +501,50 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Other listeners (form, ingredients, image) would go here...
+        addIngredientBtn.addEventListener('click', () => {
+            const ingredientText = newIngredientInput.value.trim();
+            if (ingredientText) {
+                currentIngredientsArray.push(ingredientText);
+                newIngredientInput.value = '';
+                renderIngredientList();
+                newIngredientInput.focus();
+            }
+        });
+
+        newIngredientInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addIngredientBtn.click();
+            }
+        });
+
+        recipeImageInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showMessage(errorMessageDiv, "Invalid file type. Please use JPEG, PNG, or WEBP.", true);
+                recipeImageInput.value = '';
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                showMessage(errorMessageDiv, "Image is too large (max 5MB).", true);
+                recipeImageInput.value = '';
+                return;
+            }
+            selectedImageFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => { imagePreview.src = e.target.result; }
+            reader.readAsDataURL(file);
+            imagePreviewContainer.classList.remove('hidden');
+        });
+
+        removeImageBtn.addEventListener('click', () => {
+            selectedImageFile = null;
+            recipeImageInput.value = '';
+            imagePreview.src = '#';
+            imagePreviewContainer.classList.add('hidden');
+        });
 
         // --- Initial State ---
         updateCategoryButtonStyles();
