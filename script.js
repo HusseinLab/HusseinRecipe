@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         apiKey: "AIzaSyBiV-BFHLVy0EbKIl9gnt2j-QsLUyvkZvs",
         authDomain: "my-personal-recipe-book-8b55d.firebaseapp.com",
         projectId: "my-personal-recipe-book-8b55d",
-        storageBucket: "my-personal-recipe-book-8b55d.firebasestorage.app",
+        storageBucket: "my-personal-recipe-book-8b55d.firebasestorage.app", // The corrected, working URL
         messagingSenderId: "932879383972",
         appId: "1:932879383972:web:aa977406634fa061485531",
         measurementId: "G-ZWP1BKDXY4"
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (error) => {
                     const userMessage = getFriendlyFirebaseErrorMessage(error);
                     showMessage(errorMessageDiv, `Image upload failed: ${userMessage}`, true, error);
-                    setSaveButtonLoading(false); // Reset the button on failure
+                    setSaveButtonLoading(false);
                     loadingIndicator.classList.add('hidden');
                 },
                 async () => {
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, downloadURL);
                     } catch(error) {
                          showMessage(errorMessageDiv, "Error saving recipe data after upload.", true, error);
-                         setSaveButtonLoading(false); // Also reset button here
+                         setSaveButtonLoading(false);
                          loadingIndicator.classList.add('hidden');
                     }
                 }
@@ -296,10 +296,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderRecipes() {
         if (!recipesGridContainer || !recipesGridPlaceholder) return;
+        
+        const skeletonHTML = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
+                ${[...Array(4)].map(() => `
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="h-48 w-full bg-slate-200 animate-pulse"></div>
+                    <div class="p-5">
+                        <div class="h-4 w-1/3 bg-slate-200 rounded animate-pulse mb-4"></div>
+                        <div class="h-6 w-3/4 bg-slate-200 rounded animate-pulse"></div>
+                    </div>
+                </div>`).join('')}
+            </div>`;
+
         if (!window.lastRecipeSnapshot || !userId) {
             recipesGridContainer.innerHTML = '';
             recipesGridPlaceholder.style.display = 'block';
-            recipesGridPlaceholder.innerHTML = userId ? '<p class="text-center text-gray-500 py-8 col-span-full">Loading recipes...</p>' : '<p class="text-center text-gray-500 py-8 col-span-full">Please sign in to see recipes.</p>';
+            recipesGridPlaceholder.innerHTML = userId ? skeletonHTML : '<p class="text-center text-gray-500 py-8 col-span-full">Please sign in to see recipes.</p>';
             return;
         }
 
@@ -320,25 +333,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isMatch) {
                 recipesFound++;
+                
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300 ease-in-out cursor-pointer flex flex-col group';
+                card.className = 'recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer flex flex-col group';
                 card.dataset.id = recipeId;
                 card.addEventListener('click', () => navigateToRecipeDetail(recipeId));
-                card.innerHTML = `
-                    <div class="h-48 w-full bg-slate-200 flex items-center justify-center text-slate-400">
-                        ${recipe.imageUrl ? `<img src="${recipe.imageUrl}" alt="${recipe.title}" class="w-full h-full object-cover">` : `<svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`}
-                    </div>
-                    <div class="p-5 flex-grow">
-                        <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">${recipe.category || 'Uncategorized'}</p>
-                        <h3 class="text-xl font-bold text-gray-800">${recipe.title || 'Untitled Recipe'}</h3>
-                    </div>`;
+
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'h-48 w-full recipe-card-image-container';
+
+                const imageHTML = recipe.imageUrl
+                    ? `<img src="${recipe.imageUrl}" alt="${recipe.title}" class="recipe-card-image w-full h-full object-cover">`
+                    : `<div class="w-full h-full flex items-center justify-center bg-slate-200"><svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+                
+                imageContainer.innerHTML = imageHTML;
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'p-5 flex-grow flex flex-col relative';
+
+                const textOverlay = document.createElement('div');
+                textOverlay.className = 'absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 w-full pointer-events-none';
+                textOverlay.innerHTML = `
+                    <p class="text-xs font-semibold uppercase tracking-wider">${recipe.category || 'Uncategorized'}</p>
+                    <h3 class="text-xl font-bold leading-tight">${recipe.title || 'Untitled Recipe'}</h3>
+                `;
+
+                const originalContent = document.createElement('div');
+                originalContent.className = 'group-hover:opacity-0 transition-opacity duration-300';
+                originalContent.innerHTML = `
+                    <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">${recipe.category || 'Uncategorized'}</p>
+                    <h3 class="text-xl font-bold text-gray-800">${recipe.title || 'Untitled Recipe'}</h3>
+                `;
+
+                imageContainer.appendChild(textOverlay);
+                contentDiv.appendChild(originalContent);
+                card.appendChild(imageContainer);
+                card.appendChild(contentDiv);
                 recipesGridContainer.appendChild(card);
             }
         });
         
-        recipesGridPlaceholder.style.display = recipesFound > 0 ? 'none' : 'block';
-        if(recipesFound === 0) {
+        if (recipesFound === 0) {
             recipesGridPlaceholder.innerHTML = '<p class="text-center text-gray-500 py-8 col-span-full">No recipes found matching your criteria.</p>';
+            recipesGridPlaceholder.style.display = 'block';
+        } else {
+            recipesGridPlaceholder.style.display = 'none';
         }
     }
     
@@ -376,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailRecipeTags.innerHTML = recipe.tags.map(tag => `<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium">${tag}</span>`).join('');
                 }
                 if (recipe.notes && recipe.notes.trim() !== '') {
-                    detailRecipeNotesContainer.classList.remove('view-hidden');
+                    detailRecipeNotesContainer.classList.remove('hidden');
                     detailRecipeNotes.textContent = recipe.notes;
                 }
             } else {
