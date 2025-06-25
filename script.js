@@ -321,6 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // FIX IS HERE: The handleRecipeFormSubmit function is updated to correctly handle upload errors.
     async function handleRecipeFormSubmit(event) {
         event.preventDefault();
         if (!userId) {
@@ -345,38 +346,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const notesValue = recipeNotesInput.value.trim();
         const tagsText = recipeTagsInput.value.trim();
 
-        try {
-            if (selectedImageFile) {
-                const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`;
-                const storageRefPath = `recipe_images/${userId}/${imageName}`;
-                const imageStorageRefInstance = storageRef(storage, storageRefPath);
-                const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
+        if (selectedImageFile) {
+            const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`;
+            const storageRefPath = `recipe_images/${userId}/${imageName}`;
+            const imageStorageRefInstance = storageRef(storage, storageRefPath);
+            const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
 
-                uploadTask.on('state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        loadingIndicator.style.width = progress + '%';
-                    },
-                    async (error) => {
-                        throw error;
-                    },
-                    async () => {
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    loadingIndicator.style.width = progress + '%';
+                },
+                (error) => {
+                    // THIS IS THE FIX: The error is now handled directly here.
+                    const userMessage = getFriendlyFirebaseErrorMessage(error);
+                    showMessage(errorMessageDiv, `Image upload failed: ${userMessage}`, true, error);
+                    setSaveButtonLoading(false); // Reset the button on failure
+                    loadingIndicator.classList.add('hidden');
+                },
+                async () => {
+                    try {
                         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                         await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, downloadURL);
+                    } catch(error) {
+                         showMessage(errorMessageDiv, "Error saving recipe data after upload.", true, error);
+                         setSaveButtonLoading(false); // Also reset button here
                     }
-                );
-            } else {
+                }
+            );
+        } else {
+            try {
                 let imageUrlToSave = undefined;
                 if (recipeIdToEdit) {
                     imageUrlToSave = (imagePreview.src && imagePreview.src.startsWith('http')) ? imagePreview.src : null;
                 }
                 await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, imageUrlToSave);
+            } catch(error) {
+                showMessage(errorMessageDiv, getFriendlyFirebaseErrorMessage(error), true, error);
             }
-        } catch (error) {
-            const userMessage = getFriendlyFirebaseErrorMessage(error);
-            showMessage(errorMessageDiv, userMessage, true, error);
-            setSaveButtonLoading(false);
-            loadingIndicator.classList.add('hidden');
         }
     }
     
