@@ -4,3 +4,32 @@
 .view-active {
     display: block;
 }
+
+.recipe-card-image-container {
+    position: relative;
+    overflow: hidden; /* This is crucial for the scaling effect */
+}
+
+.recipe-card-image-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60%; /* Adjust height of the gradient */
+    background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.recipe-card:hover .recipe-card-image-container::after {
+    opacity: 1;
+}
+
+.recipe-card-image {
+    transition: transform 0.4s ease-in-out;
+}
+
+.recipe-card:hover .recipe-card-image {
+    transform: scale(1.1);
+}
