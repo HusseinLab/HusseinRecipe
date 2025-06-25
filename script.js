@@ -1,14 +1,14 @@
+// All 'import' statements MUST be at the top level of the module.
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+// The rest of the application logic is wrapped in DOMContentLoaded
+// to ensure the HTML page is fully loaded before we try to find elements.
 document.addEventListener('DOMContentLoaded', () => {
-    // All code now lives inside this listener to ensure the page is ready.
 
     console.log("SCRIPT: DOMContentLoaded - Event fired. Initializing application.");
-
-    // --- Import Firebase SDKs (This is a special case and works at the top level) ---
-    // The browser handles module imports before executing the script body.
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
     // --- Global Variables ---
     let app, auth, db, storage;
@@ -75,24 +75,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteRecipeBtn = document.getElementById('deleteRecipeBtn');
     const views = ['browseView', 'recipeDetailView', 'recipeFormView'];
 
-    // --- ALL FUNCTION DEFINITIONS ARE NOW SAFELY INSIDE DOMContentLoaded ---
+    // --- FUNCTION DEFINITIONS ---
 
     function showView(viewIdToShow) {
         views.forEach(viewId => {
             const viewElement = document.getElementById(viewId);
             if (viewElement) {
+                // Using style.display is more direct than toggling classes here
                 viewElement.style.display = viewId === viewIdToShow ? 'block' : 'none';
             }
         });
-        if (viewIdToShow === 'browseView') loadBrowseViewRecipes();
+        if (viewIdToShow === 'browseView' && typeof loadBrowseViewRecipes === 'function') {
+            loadBrowseViewRecipes();
+        }
     }
 
     function showMessage(element, userMessage, isError = false, duration = 4000, error = null) {
         if (!element) return;
         if (isError && error) console.error(`User Message: "${userMessage}" \nDetailed Error:`, error);
-        element.textContent = userMessage;
+        
+        // Temporarily remove the hidden class to make it visible
+        element.classList.remove('hidden'); 
         element.className = `p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg ${isError ? 'bg-red-500' : 'bg-green-500'}`;
-        setTimeout(() => { element.className += ' hidden'; }, duration);
+        
+        setTimeout(() => {
+            element.classList.add('hidden');
+        }, duration);
     }
 
     function getFriendlyFirebaseErrorMessage(error) {
@@ -110,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (recipeForm) recipeForm.reset();
         if (recipeIdInput) recipeIdInput.value = '';
         currentIngredientsArray = [];
-        renderIngredientList();
+        if (typeof renderIngredientList === 'function') renderIngredientList();
         selectedImageFile = null;
         if (recipeImageInput) recipeImageInput.value = '';
         if (imagePreview) imagePreview.src = '#';
@@ -119,8 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleGoogleSignIn() {
         if (!auth) { showMessage(errorMessageDiv, "Auth service not ready.", true); return; }
+        const provider = new GoogleAuthProvider();
         try {
-            const result = await signInWithPopup(auth, new GoogleAuthProvider());
+            const result = await signInWithPopup(auth, provider);
             showMessage(successMessageDiv, `Welcome, ${result.user.displayName}!`);
         } catch (error) {
             showMessage(errorMessageDiv, getFriendlyFirebaseErrorMessage(error), true, error);
@@ -150,14 +159,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ingredientListDisplay.appendChild(itemDiv);
         });
     }
-    
-    // All other function definitions like handleRecipeFormSubmit, saveRecipeDataToFirestore, etc. go here...
-    // The key is that they are all defined within this scope before the event listeners are attached.
 
     function loadBrowseViewRecipes() {
-        if (!userId) { return; }
+        if (!userId) return;
         if (recipesUnsubscribe) {
-            renderRecipes(); // If already subscribed, just render
+            renderRecipes();
             return;
         }
         const q = query(collection(db, `artifacts/${appId}/users/${userId}/recipes`), orderBy("createdAt", "desc"));
@@ -168,16 +174,16 @@ document.addEventListener('DOMContentLoaded', () => {
             showMessage(errorMessageDiv, `Error fetching recipes: ${getFriendlyFirebaseErrorMessage(error)}`, true, error);
         });
     }
-    
+
     function renderRecipes() {
         if (!recipesGridContainer || !recipesGridPlaceholder) return;
         if (!window.lastRecipeSnapshot || !userId) {
             recipesGridContainer.innerHTML = '';
             recipesGridPlaceholder.style.display = 'block';
-            recipesGridPlaceholder.textContent = userId ? 'Loading...' : 'Please sign in to see recipes.';
+            recipesGridPlaceholder.innerHTML = userId ? '<p class="text-center text-gray-500 py-8 col-span-full">Loading recipes...</p>' : '<p class="text-center text-gray-500 py-8 col-span-full">Please sign in to see recipes.</p>';
             return;
         }
-        
+
         recipesGridContainer.innerHTML = '';
         let recipesFound = 0;
         const searchTerm = (headerSearchInput.value || "").toLowerCase().trim();
@@ -208,23 +214,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 recipesGridContainer.appendChild(card);
             }
         });
-        recipesGridPlaceholder.style.display = recipesFound > 0 ? 'none' : 'block';
-        recipesGridPlaceholder.textContent = recipesFound === 0 ? 'No recipes found.' : '';
-    }
 
+        recipesGridPlaceholder.style.display = recipesFound > 0 ? 'none' : 'block';
+        if(recipesFound === 0) {
+            recipesGridPlaceholder.innerHTML = '<p class="text-center text-gray-500 py-8 col-span-full">No recipes found. Try a different search or category!</p>';
+        }
+    }
+    
     async function navigateToRecipeDetail(recipeId) {
         if (!userId) return;
         currentRecipeIdInDetailView = recipeId;
         showView('recipeDetailView');
         // Clear previous details and show loading state
-        // ...
+        detailRecipeTitle.textContent = "Loading...";
+        detailRecipeCategory.textContent = "";
+        detailRecipeIngredients.innerHTML = "";
+        detailRecipeDirections.innerHTML = "";
         try {
             const docSnap = await getDoc(doc(db, `artifacts/${appId}/users/${userId}/recipes`, recipeId));
             if (docSnap.exists()) {
                 const recipe = docSnap.data();
                 detailRecipeTitle.textContent = recipe.title;
                 detailRecipeCategory.textContent = recipe.category;
-                // and so on...
+                detailRecipeIngredients.innerHTML = (recipe.ingredients || []).map(ing => `<li>${ing}</li>`).join('');
+                detailRecipeDirections.innerHTML = (recipe.directions || []).map(dir => `<li>${dir}</li>`).join('');
+                // etc.
             } else {
                 showMessage(errorMessageDiv, "Recipe not found.", true);
                 showView('browseView');
@@ -233,10 +247,11 @@ document.addEventListener('DOMContentLoaded', () => {
             showMessage(errorMessageDiv, getFriendlyFirebaseErrorMessage(error), true, error);
         }
     }
-    
-    // ... other functions like handleDeleteRecipe, populateFormForEdit, saveRecipeDataToFirestore
 
-    // --- MAIN EXECUTION ---
+    // ... other functions like handleDeleteRecipe, populateFormForEdit, saveRecipeDataToFirestore
+    // They are defined here, before being used by event listeners.
+
+    // --- MAIN EXECUTION LOGIC ---
     try {
         // 1. Initialize Firebase
         app = initializeApp(firebaseConfig);
@@ -252,6 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 userInfoDiv.style.display = 'flex';
                 googleSignInBtn.style.display = 'none';
                 userNameSpan.textContent = user.displayName || "User";
+                if (recipesUnsubscribe) recipesUnsubscribe(); // Unsubscribe from old user's data
+                recipesUnsubscribe = null; // Reset listener
                 loadBrowseViewRecipes();
             } else {
                 userId = null;
@@ -262,26 +279,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 userInfoDiv.style.display = 'none';
                 googleSignInBtn.style.display = 'block';
                 window.lastRecipeSnapshot = null;
-                renderRecipes(); // This will show the "please sign in" message
+                renderRecipes();
             }
         });
 
         // 3. Attach All Event Listeners
         googleSignInBtn.addEventListener('click', handleGoogleSignIn);
         signOutBtn.addEventListener('click', handleSignOut);
+        
         navigateToAddRecipeBtn.addEventListener('click', () => {
             if (!userId) { showMessage(errorMessageDiv, "Please sign in to add recipes.", true); return; }
             resetRecipeForm();
             formTitle.textContent = 'Add New Recipe';
             showView('recipeFormView');
         });
+
         navigateToBrowseBtnDetail.addEventListener('click', () => showView('browseView'));
         navigateToBrowseBtnForm.addEventListener('click', () => {
              resetRecipeForm();
              showView('browseView');
         });
-        // ... other listeners for recipe form, search, etc.
         
+        const syncSearchAndRender = () => renderRecipes();
+        headerSearchInput.addEventListener('input', syncSearchAndRender);
+        mobileSearchInput.addEventListener('input', syncSearchAndRender);
+
+        // ... other listeners
+
         // 4. Set Initial View
         showView('browseView');
 
