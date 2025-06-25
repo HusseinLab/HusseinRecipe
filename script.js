@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         apiKey: "AIzaSyBiV-BFHLVy0EbKIl9gnt2j-QsLUyvkZvs",
         authDomain: "my-personal-recipe-book-8b55d.firebaseapp.com",
         projectId: "my-personal-recipe-book-8b55d",
-        storageBucket: "my-personal-recipe-book-8b55d.appspot.com",
+        storageBucket: "my-personal-recipe-book-8b55d.firebasestorage.app",
         messagingSenderId: "932879383972",
         appId: "1:932879383972:web:aa977406634fa061485531",
         measurementId: "G-ZWP1BKDXY4"
