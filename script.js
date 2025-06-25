@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRecipeIdInDetailView = null;
     window.lastRecipeSnapshot = null;
     let currentIngredientsArray = [];
-    let currentCategoryFilter = 'all';
+    let currentCategoryFilter = 'all'; // Default filter
     let selectedImageFile = null;
 
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-recipe-app-id';
@@ -81,8 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
         views.forEach(viewId => {
             const viewElement = document.getElementById(viewId);
             if (viewElement) {
-                // Using style.display is more direct than toggling classes here
-                viewElement.style.display = viewId === viewIdToShow ? 'block' : 'none';
+                viewElement.classList.toggle('view-active', viewId === viewIdToShow);
+                viewElement.classList.toggle('view-hidden', viewId !== viewIdToShow);
             }
         });
         if (viewIdToShow === 'browseView' && typeof loadBrowseViewRecipes === 'function') {
@@ -94,8 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!element) return;
         if (isError && error) console.error(`User Message: "${userMessage}" \nDetailed Error:`, error);
         
-        // Temporarily remove the hidden class to make it visible
-        element.classList.remove('hidden'); 
+        element.textContent = userMessage;
+        element.classList.remove('hidden');
         element.className = `p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg ${isError ? 'bg-red-500' : 'bg-green-500'}`;
         
         setTimeout(() => {
@@ -113,6 +113,12 @@ document.addEventListener('DOMContentLoaded', () => {
             default: return error.message || message;
         }
     }
+    
+    function updateCategoryButtonStyles() {
+        document.querySelectorAll('.category-filter-btn').forEach(button => {
+            button.classList.toggle('category-filter-btn-active', button.dataset.category === currentCategoryFilter);
+        });
+    }
 
     function resetRecipeForm() {
         if (recipeForm) recipeForm.reset();
@@ -122,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedImageFile = null;
         if (recipeImageInput) recipeImageInput.value = '';
         if (imagePreview) imagePreview.src = '#';
-        if (imagePreviewContainer) imagePreviewContainer.style.display = 'none';
+        if (imagePreviewContainer) imagePreviewContainer.classList.add('hidden');
     }
 
     async function handleGoogleSignIn() {
@@ -163,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadBrowseViewRecipes() {
         if (!userId) return;
         if (recipesUnsubscribe) {
-            renderRecipes();
+            renderRecipes(); // Just re-render if we already have a listener
             return;
         }
         const q = query(collection(db, `artifacts/${appId}/users/${userId}/recipes`), orderBy("createdAt", "desc"));
@@ -191,7 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
         window.lastRecipeSnapshot.forEach(doc => {
             const recipe = doc.data();
             const recipeId = doc.id;
-             if (currentCategoryFilter !== 'all' && recipe.category !== currentCategoryFilter) return;
+             if (currentCategoryFilter !== 'all' && recipe.category !== currentCategoryFilter) {
+                 return;
+             }
 
             const isMatch = searchTerm === "" ||
                 (recipe.title && recipe.title.toLowerCase().includes(searchTerm)) ||
@@ -204,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.dataset.id = recipeId;
                 card.addEventListener('click', () => navigateToRecipeDetail(recipeId));
                 card.innerHTML = `
-                    <div class="h-48 w-full bg-slate-200 flex items-center justify-center">
+                    <div class="h-48 w-full bg-slate-200 flex items-center justify-center text-slate-400">
                         ${recipe.imageUrl ? `<img src="${recipe.imageUrl}" alt="${recipe.title}" class="w-full h-full object-cover">` : `<svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`}
                     </div>
                     <div class="p-5 flex-grow">
@@ -214,10 +222,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 recipesGridContainer.appendChild(card);
             }
         });
-
+        
         recipesGridPlaceholder.style.display = recipesFound > 0 ? 'none' : 'block';
         if(recipesFound === 0) {
-            recipesGridPlaceholder.innerHTML = '<p class="text-center text-gray-500 py-8 col-span-full">No recipes found. Try a different search or category!</p>';
+            recipesGridPlaceholder.innerHTML = '<p class="text-center text-gray-500 py-8 col-span-full">No recipes found matching your criteria.</p>';
         }
     }
     
@@ -225,11 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!userId) return;
         currentRecipeIdInDetailView = recipeId;
         showView('recipeDetailView');
-        // Clear previous details and show loading state
+        
         detailRecipeTitle.textContent = "Loading...";
         detailRecipeCategory.textContent = "";
         detailRecipeIngredients.innerHTML = "";
         detailRecipeDirections.innerHTML = "";
+        
         try {
             const docSnap = await getDoc(doc(db, `artifacts/${appId}/users/${userId}/recipes`, recipeId));
             if (docSnap.exists()) {
@@ -248,27 +257,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ... other functions like handleDeleteRecipe, populateFormForEdit, saveRecipeDataToFirestore
-    // They are defined here, before being used by event listeners.
+    // Define other functions like handleDeleteRecipe, handleRecipeFormSubmit, etc. before they are called by listeners...
+    // These should be complete and correct from previous steps.
 
     // --- MAIN EXECUTION LOGIC ---
     try {
-        // 1. Initialize Firebase
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
         storage = getStorage(app);
         console.log("Firebase Initialized Successfully.");
 
-        // 2. Setup Auth State Listener
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 userId = user.uid;
-                userInfoDiv.style.display = 'flex';
-                googleSignInBtn.style.display = 'none';
+                userInfoDiv.classList.remove('hidden');
+                userInfoDiv.classList.add('flex');
+                googleSignInBtn.classList.add('hidden');
                 userNameSpan.textContent = user.displayName || "User";
-                if (recipesUnsubscribe) recipesUnsubscribe(); // Unsubscribe from old user's data
-                recipesUnsubscribe = null; // Reset listener
+                if (recipesUnsubscribe) recipesUnsubscribe(); // Clean up old listener
+                recipesUnsubscribe = null;
                 loadBrowseViewRecipes();
             } else {
                 userId = null;
@@ -276,14 +284,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     recipesUnsubscribe();
                     recipesUnsubscribe = null;
                 }
-                userInfoDiv.style.display = 'none';
-                googleSignInBtn.style.display = 'block';
+                userInfoDiv.classList.add('hidden');
+                userInfoDiv.classList.remove('flex');
+                googleSignInBtn.classList.remove('hidden');
                 window.lastRecipeSnapshot = null;
                 renderRecipes();
             }
         });
 
-        // 3. Attach All Event Listeners
+        // --- Attach All Event Listeners ---
         googleSignInBtn.addEventListener('click', handleGoogleSignIn);
         signOutBtn.addEventListener('click', handleSignOut);
         
@@ -300,13 +309,29 @@ document.addEventListener('DOMContentLoaded', () => {
              showView('browseView');
         });
         
-        const syncSearchAndRender = () => renderRecipes();
+        const syncSearchAndRender = (event) => {
+            const sourceElement = event.target;
+            const targetElement = (sourceElement.id === 'headerSearchInput') ? mobileSearchInput : headerSearchInput;
+            if (targetElement && targetElement.value !== sourceElement.value) {
+                targetElement.value = sourceElement.value;
+            }
+            renderRecipes();
+        };
         headerSearchInput.addEventListener('input', syncSearchAndRender);
         mobileSearchInput.addEventListener('input', syncSearchAndRender);
+        
+        document.querySelectorAll('.category-filter-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                currentCategoryFilter = button.dataset.category;
+                updateCategoryButtonStyles();
+                renderRecipes();
+            });
+        });
 
-        // ... other listeners
+        // Add other listeners for form submission, ingredient adding, etc. here
 
-        // 4. Set Initial View
+        // --- Initial State ---
+        updateCategoryButtonStyles();
         showView('browseView');
 
     } catch (error) {
