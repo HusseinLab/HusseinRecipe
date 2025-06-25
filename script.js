@@ -334,8 +334,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isMatch) {
                 recipesFound++;
                 
+                // =================================================================
+                // THIS IS THE CORRECTED CARD CREATION LOGIC
+                // =================================================================
                 const card = document.createElement('div');
-                card.className = 'recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer flex flex-col group';
+                card.className = 'recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative'; // Added relative
                 card.dataset.id = recipeId;
                 card.addEventListener('click', () => navigateToRecipeDetail(recipeId));
 
@@ -349,27 +352,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 imageContainer.innerHTML = imageHTML;
                 
                 const contentDiv = document.createElement('div');
-                contentDiv.className = 'p-5 flex-grow flex flex-col relative';
+                contentDiv.className = 'p-5 flex-grow flex flex-col';
 
-                const textOverlay = document.createElement('div');
-                textOverlay.className = 'absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 w-full pointer-events-none';
-                textOverlay.innerHTML = `
-                    <p class="text-xs font-semibold uppercase tracking-wider">${recipe.category || 'Uncategorized'}</p>
-                    <h3 class="text-xl font-bold leading-tight">${recipe.title || 'Untitled Recipe'}</h3>
-                `;
-
+                // This is the original, always-visible text
                 const originalContent = document.createElement('div');
-                originalContent.className = 'group-hover:opacity-0 transition-opacity duration-300';
+                originalContent.className = 'transition-opacity duration-300 group-hover:opacity-0';
                 originalContent.innerHTML = `
                     <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">${recipe.category || 'Uncategorized'}</p>
                     <h3 class="text-xl font-bold text-gray-800">${recipe.title || 'Untitled Recipe'}</h3>
                 `;
 
-                imageContainer.appendChild(textOverlay);
+                // This is the white text that appears on hover
+                const hoverContent = document.createElement('div');
+                hoverContent.className = 'absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none w-full';
+                hoverContent.innerHTML = `
+                    <p class="text-xs font-semibold uppercase tracking-wider">${recipe.category || 'Uncategorized'}</p>
+                    <h3 class="text-xl font-bold leading-tight">${recipe.title || 'Untitled Recipe'}</h3>
+                `;
+
                 contentDiv.appendChild(originalContent);
                 card.appendChild(imageContainer);
                 card.appendChild(contentDiv);
+                card.appendChild(hoverContent); // Append hover text separately to ensure it's on top
+                
                 recipesGridContainer.appendChild(card);
+                // =================================================================
+                // END OF CORRECTED CARD CREATION LOGIC
+                // =================================================================
             }
         });
         
