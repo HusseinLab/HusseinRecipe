@@ -4,8 +4,6 @@ import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signO
 import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-// The rest of the application logic is wrapped in DOMContentLoaded
-// to ensure the HTML page is fully loaded before we try to find elements.
 document.addEventListener('DOMContentLoaded', () => {
 
     console.log("SCRIPT: DOMContentLoaded - Event fired. Initializing application.");
@@ -126,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'auth/user-cancelled': case 'auth/popup-closed-by-user': return "Sign-in was cancelled.";
             case 'auth/network-request-failed': return "Network error. Please check your internet connection.";
             case 'firestore/permission-denied': return "You do not have permission to perform this action.";
+            case 'storage/unauthorized': return "You do not have permission to upload this file. Please check storage rules.";
             default: return error.message || message;
         }
     }
@@ -182,6 +181,104 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function handleRecipeFormSubmit(event) {
+        event.preventDefault();
+        if (!userId) {
+            showMessage(errorMessageDiv, "You must be logged in to save recipes.", true);
+            return;
+        }
+
+        const titleValue = recipeTitleInput.value.trim();
+        const categoryValue = recipeCategoryInput.value;
+        const directionsText = recipeDirectionsInput.value.trim();
+        const recipeIdToEdit = recipeIdInput.value;
+
+        if (!titleValue || !categoryValue || currentIngredientsArray.length === 0 || !directionsText) {
+            showMessage(errorMessageDiv, "Title, Category, at least one Ingredient, and Directions are required.", true);
+            return;
+        }
+
+        setSaveButtonLoading(true);
+        loadingIndicator.classList.remove('hidden');
+        loadingIndicator.style.width = '0%';
+
+        const notesValue = recipeNotesInput.value.trim();
+        const tagsText = recipeTagsInput.value.trim();
+
+        if (selectedImageFile) {
+            const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`;
+            const storageRefPath = `recipe_images/${userId}/${imageName}`;
+            const imageStorageRefInstance = storageRef(storage, storageRefPath);
+            const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    loadingIndicator.style.width = progress + '%';
+                },
+                (error) => {
+                    const userMessage = getFriendlyFirebaseErrorMessage(error);
+                    showMessage(errorMessageDiv, `Image upload failed: ${userMessage}`, true, error);
+                    setSaveButtonLoading(false); // Reset the button on failure
+                    loadingIndicator.classList.add('hidden');
+                },
+                async () => {
+                    try {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, downloadURL);
+                    } catch(error) {
+                         showMessage(errorMessageDiv, "Error saving recipe data after upload.", true, error);
+                         setSaveButtonLoading(false); // Also reset button here
+                         loadingIndicator.classList.add('hidden');
+                    }
+                }
+            );
+        } else {
+            try {
+                let imageUrlToSave = undefined;
+                if (recipeIdToEdit) {
+                    imageUrlToSave = (imagePreview.src && imagePreview.src.startsWith('http')) ? imagePreview.src : null;
+                }
+                await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, imageUrlToSave);
+            } catch(error) {
+                showMessage(errorMessageDiv, `Error saving recipe: ${getFriendlyFirebaseErrorMessage(error)}`, true, error);
+            }
+        }
+    }
+    
+    async function saveRecipeDataToFirestore(recipeIdToEdit, title, category, directions, notes, tags, imageUrl) {
+        const recipeData = {
+            title, category,
+            ingredients: [...currentIngredientsArray],
+            directions: directions.split('\n').map(s => s.trim()).filter(Boolean),
+            notes,
+            tags: tags.split(',').map(s => s.trim()).filter(Boolean),
+        };
+        
+        try {
+            const recipesCol = collection(db, `artifacts/${appId}/users/${userId}/recipes`);
+            if (recipeIdToEdit) {
+                const dataToUpdate = { ...recipeData, lastUpdatedAt: Timestamp.now() };
+                if (imageUrl !== undefined) dataToUpdate.imageUrl = imageUrl;
+                await updateDoc(doc(recipesCol, recipeIdToEdit), dataToUpdate);
+                showMessage(successMessageDiv, "Recipe updated successfully!");
+            } else {
+                const dataToAdd = { ...recipeData, userId, createdAt: Timestamp.now() };
+                if (imageUrl) dataToAdd.imageUrl = imageUrl;
+                await addDoc(recipesCol, dataToAdd);
+                showMessage(successMessageDiv, "Recipe added successfully!");
+            }
+            
+            resetRecipeForm();
+            showView('browseView');
+        } catch (error) {
+            throw error;
+        } finally {
+            setSaveButtonLoading(false);
+            loadingIndicator.classList.add('hidden');
+        }
+    }
+    
     function loadBrowseViewRecipes() {
         if (!userId) return;
         if (recipesUnsubscribe) {
@@ -318,105 +415,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             showMessage(errorMessageDiv, `Error loading recipe for editing: ${getFriendlyFirebaseErrorMessage(error)}`, true);
-        }
-    }
-
-    // FIX IS HERE: The handleRecipeFormSubmit function is updated to correctly handle upload errors.
-    async function handleRecipeFormSubmit(event) {
-        event.preventDefault();
-        if (!userId) {
-            showMessage(errorMessageDiv, "You must be logged in to save recipes.", true);
-            return;
-        }
-
-        const titleValue = recipeTitleInput.value.trim();
-        const categoryValue = recipeCategoryInput.value;
-        const directionsText = recipeDirectionsInput.value.trim();
-        const recipeIdToEdit = recipeIdInput.value;
-
-        if (!titleValue || !categoryValue || currentIngredientsArray.length === 0 || !directionsText) {
-            showMessage(errorMessageDiv, "Title, Category, at least one Ingredient, and Directions are required.", true);
-            return;
-        }
-
-        setSaveButtonLoading(true);
-        loadingIndicator.classList.remove('hidden');
-        loadingIndicator.style.width = '0%';
-
-        const notesValue = recipeNotesInput.value.trim();
-        const tagsText = recipeTagsInput.value.trim();
-
-        if (selectedImageFile) {
-            const imageName = `${userId}_${Date.now()}_${selectedImageFile.name.replace(/\s+/g, '_')}`;
-            const storageRefPath = `recipe_images/${userId}/${imageName}`;
-            const imageStorageRefInstance = storageRef(storage, storageRefPath);
-            const uploadTask = uploadBytesResumable(imageStorageRefInstance, selectedImageFile);
-
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    loadingIndicator.style.width = progress + '%';
-                },
-                (error) => {
-                    // THIS IS THE FIX: The error is now handled directly here.
-                    const userMessage = getFriendlyFirebaseErrorMessage(error);
-                    showMessage(errorMessageDiv, `Image upload failed: ${userMessage}`, true, error);
-                    setSaveButtonLoading(false); // Reset the button on failure
-                    loadingIndicator.classList.add('hidden');
-                },
-                async () => {
-                    try {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, downloadURL);
-                    } catch(error) {
-                         showMessage(errorMessageDiv, "Error saving recipe data after upload.", true, error);
-                         setSaveButtonLoading(false); // Also reset button here
-                    }
-                }
-            );
-        } else {
-            try {
-                let imageUrlToSave = undefined;
-                if (recipeIdToEdit) {
-                    imageUrlToSave = (imagePreview.src && imagePreview.src.startsWith('http')) ? imagePreview.src : null;
-                }
-                await saveRecipeDataToFirestore(recipeIdToEdit, titleValue, categoryValue, directionsText, notesValue, tagsText, imageUrlToSave);
-            } catch(error) {
-                showMessage(errorMessageDiv, getFriendlyFirebaseErrorMessage(error), true, error);
-            }
-        }
-    }
-    
-    async function saveRecipeDataToFirestore(recipeIdToEdit, title, category, directions, notes, tags, imageUrl) {
-        const recipeData = {
-            title, category,
-            ingredients: [...currentIngredientsArray],
-            directions: directions.split('\n').map(s => s.trim()).filter(Boolean),
-            notes,
-            tags: tags.split(',').map(s => s.trim()).filter(Boolean),
-        };
-
-        try {
-            const recipesCol = collection(db, `artifacts/${appId}/users/${userId}/recipes`);
-            if (recipeIdToEdit) {
-                const dataToUpdate = { ...recipeData, lastUpdatedAt: Timestamp.now() };
-                if (imageUrl !== undefined) dataToUpdate.imageUrl = imageUrl;
-                await updateDoc(doc(recipesCol, recipeIdToEdit), dataToUpdate);
-                showMessage(successMessageDiv, "Recipe updated successfully!");
-            } else {
-                const dataToAdd = { ...recipeData, userId, createdAt: Timestamp.now() };
-                if (imageUrl) dataToAdd.imageUrl = imageUrl;
-                await addDoc(recipesCol, dataToAdd);
-                showMessage(successMessageDiv, "Recipe added successfully!");
-            }
-            
-            resetRecipeForm();
-            showView('browseView');
-        } catch (error) {
-            throw error;
-        } finally {
-            setSaveButtonLoading(false);
-            loadingIndicator.classList.add('hidden');
         }
     }
     
