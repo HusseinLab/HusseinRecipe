@@ -69,3 +69,31 @@ body.dark .category-filter-btn { background-color:#334155; color:#e2e8f0; }
 body.dark .category-filter-btn:hover { background-color:#475569; }
 body.dark .category-filter-btn-active,
 body.dark .category-filter-btn-active:hover { background-color:#6366f1; }
+
+/* ── Dark-mode overrides for existing utility classes ────────── */
+
+/* Make every bg-white panel dark gray in dark mode */
+html.dark .bg-white {
+  background-color: #1f2937 !important; /* Tailwind gray-800 */
+}
+
+/* Also dunk any slate-200 placeholders (like skeletons or detail-image placeholder) */
+html.dark .bg-slate-200 {
+  background-color: #374151 !important; /* Tailwind gray-700 */
+}
+
+/* Ensure text-gray-800 and text-gray-700 switch to light colors */
+html.dark .text-gray-800,
+html.dark .text-slate-800 {
+  color: #f3f4f6 !important; /* Tailwind gray-100 */
+}
+html.dark .text-gray-700,
+html.dark .text-slate-700 {
+  color: #d1d5db !important; /* Tailwind gray-300 */
+}
+
+/* Tweak border colors so outlines aren’t too stark */
+html.dark .border-gray-200,
+html.dark .border-slate-300 {
+  border-color: #4b5563 !important; /* Tailwind gray-600 */
+}
