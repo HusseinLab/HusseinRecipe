@@ -388,14 +388,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.addEventListener('click', () => { window.location.hash = `/recipe/${recipeId}`; });
 
                 const imageContainer = document.createElement('div');
-                imageContainer.className = 'recipe-thumb recipe-card-image-container';
-
-
-                const imageHTML = recipe.imageUrl
-                    ? `<img src="${recipe.imageUrl}" alt="${recipe.title}" class="recipe-card-image">`
-                    : `<div class="w-full h-full flex items-center justify-center bg-slate-200"><svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+                imageContainer.className = 'recipe-thumb recipe-card-image-container overflow-hidden relative';
                 
-                imageContainer.innerHTML = imageHTML;
+                if (recipe.imageUrl) {
+                    // 1️⃣ Gray shimmer placeholder
+                    const skeleton = document.createElement('div');
+                    skeleton.className = 'absolute inset-0 bg-slate-200 animate-pulse';
+                    imageContainer.appendChild(skeleton);
+                
+                    // 2️⃣ Actual image (hidden until fully loaded)
+                    const imgEl = new Image();
+                    imgEl.src = recipe.imageUrl;
+                    imgEl.alt = recipe.title;
+                    imgEl.className = 'recipe-card-image hidden';
+                
+                    imgEl.addEventListener('load', () => {
+                        skeleton.remove();          // remove shimmer
+                        imgEl.classList.remove('hidden');
+                    });
+                
+                    imgEl.addEventListener('error', () => {
+                        // fallback icon if the image fails
+                        skeleton.innerHTML =
+                          '<div class="flex items-center justify-center h-full text-slate-400">' +
+                          '<svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"' +
+                          ' d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>' +
+                          '</svg></div>';
+                    });
+                
+                    imageContainer.appendChild(imgEl);
+                } else {
+                    // No image supplied → static camera icon
+                    imageContainer.innerHTML =
+                      '<div class="w-full h-full flex items-center justify-center bg-slate-200">' +
+                      '<svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"' +
+                      ' d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>' +
+                      '</svg></div>';
+                }
+
                 
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'p-5 flex-grow flex flex-col';
