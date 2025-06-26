@@ -161,3 +161,50 @@ html.dark .border-slate-300 {
 .recipe-card:hover .absolute.bottom-0.left-0.p-5 {
   background-color: rgba(0, 0, 0, 0.6);
 }
+
+/* ── Print styles: show only the recipe detail ───────────── */
+@media print {
+  /* Hide everything but the recipe section */
+  header,
+  footer,
+  #browseView,
+  #recipeFormView,
+  #authContainer,
+  #themeToggleBtn,
+  #shareBtn,
+  #printBtn,
+  .btn-tactile,
+  .category-filter-btn,
+  #categoryFilterBar {
+    display: none !important;
+  }
+
+  /* Ensure the detail section fills the page */
+  body,
+  html {
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  #singleRecipeSection {
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+  /* Remove any overflow rules */
+  #singleRecipeSection *,
+  #singleRecipeSection *::before,
+  #singleRecipeSection *::after {
+    overflow: visible !important;
+  }
+
+  /* Make fonts legible */
+  #singleRecipeSection h2,
+  #singleRecipeSection p,
+  #singleRecipeSection li {
+    color: #000 !important;
+  }
+}
