@@ -5,6 +5,23 @@
     display: block;
 }
 
+/* ── Recipe card thumbnail with 4:3 aspect ratio ─────────────── */
+.recipe-thumb {
+  position: relative;
+  width: 100%;
+  padding-top: 75%;          /* 4 : 3 ( 3 / 4 = .75 ) */
+  overflow: hidden;
+  border-radius: 0.5rem;     /* matches Tailwind rounded‑lg */
+}
+.recipe-thumb img {
+  position: absolute;
+  inset: 0;                  /* top:0 right:0 bottom:0 left:0 */
+  width: 100%;
+  height: 100%;
+  object-fit: cover;         /* crop without distortion */
+}
+
+
 .recipe-card-image-container {
     position: relative;
     overflow: hidden; /* This is crucial for the scaling effect */
