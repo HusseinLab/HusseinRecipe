@@ -547,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      detailRecipeNotesContainer.classList.remove('view-hidden');
                      detailRecipeNotes.innerHTML = marked.parse(recipe.notes);
                  }
-             else {
+            } else {
                 showMessage(errorMessageDiv, "Recipe not found.", true);
                 showView('browseView');
             }
