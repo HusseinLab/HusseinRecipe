@@ -50,6 +50,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInfoDiv = document.getElementById('userInfo');
     const userNameSpan = document.getElementById('userName');
     const signOutBtn = document.getElementById('signOutBtn');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+    // SVG strings (Heroicons, 24 px)
+    const moonSVG = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+           fill="currentColor" class="h-5 w-5">
+        <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"/>
+      </svg>`;
+    const sunSVG = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+           fill="currentColor" class="h-5 w-5">
+        <path d="M12 18a6 6 0 100-12 6 6 0 000 12z"/>
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.364-6.364l-1.414 1.414M6.05 17.95l-1.414 1.414M17.95 17.95l-1.414-1.414M6.05 6.05L4.636 7.464"/>
+      </svg>`;
+
     const navigateToAddRecipeBtn = document.getElementById('navigateToAddRecipeBtn');
     const navigateToBrowseBtnDetail = document.getElementById('navigateToBrowseBtnDetail');
     const navigateToBrowseBtnForm = document.getElementById('navigateToBrowseBtnForm');
@@ -117,6 +133,31 @@ document.addEventListener('DOMContentLoaded', () => {
             loadBrowseViewRecipes();
         }
     }
+            // ── Theme utilities ───────────────────────────
+        function applyTheme(mode) {
+          const root = document.documentElement;
+          if (mode === 'dark') {
+            root.classList.add('dark');
+            themeToggleBtn.innerHTML = sunSVG;
+          } else {
+            root.classList.remove('dark');
+            themeToggleBtn.innerHTML = moonSVG;
+          }
+        }
+        
+        // Initial theme decision
+        const savedTheme = localStorage.getItem('theme');     // 'dark' | 'light' | null
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(savedTheme || (prefersDark ? 'dark' : 'light'));
+        
+        // Button click
+        themeToggleBtn.addEventListener('click', () => {
+          const isDark = document.documentElement.classList.contains('dark');
+          const next = isDark ? 'light' : 'dark';
+          localStorage.setItem('theme', next);
+          applyTheme(next);
+        });
+
 
 
             function handleRoute () {
