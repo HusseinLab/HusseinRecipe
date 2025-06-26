@@ -118,13 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-                /**
-             * Tiny hash router.
-             * Accepts:
-             *   #/recipe/<docId>  → opens detail view
-             *   #/add             → opens “add recipe” form
-             *   (anything else)   → shows browse grid
-             */
+
             function handleRoute () {
               const hash = window.location.hash.slice(1);          // remove leading '#'
               const [route, param] = hash.split('/').filter(Boolean);
