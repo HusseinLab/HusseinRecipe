@@ -156,3 +156,8 @@ html.dark .border-gray-200,
 html.dark .border-slate-300 {
   border-color: #4b5563 !important; /* gray-600 */
 }
+
+/* Target that absolute overlay (the white text) on hover: */
+.recipe-card:hover .absolute.bottom-0.left-0.p-5 {
+  background-color: rgba(0, 0, 0, 0.6);
+}
