@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { marked } from 'https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.esm.min.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -542,11 +543,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailRecipeTagsContainer.classList.remove('view-hidden');
                     detailRecipeTags.innerHTML = recipe.tags.map(tag => `<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium">${tag}</span>`).join('');
                 }
-                if (recipe.notes && recipe.notes.trim() !== '') {
-                    detailRecipeNotesContainer.classList.remove('hidden');
-                    detailRecipeNotes.textContent = recipe.notes;
-                }
-            } else {
+                 if (recipe.notes && recipe.notes.trim() !== '') {
+                     detailRecipeNotesContainer.classList.remove('view-hidden');
+                     detailRecipeNotes.innerHTML = marked.parse(recipe.notes);
+                 }
+             else {
                 showMessage(errorMessageDiv, "Recipe not found.", true);
                 showView('browseView');
             }
