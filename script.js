@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
         measurementId: "G-ZWP1BKDXY4"
     };
 
-        // Share / copy‑link button
+            // Share / copy‑link button
         const shareBtn = document.getElementById('shareBtn');
         if (shareBtn) {
           shareBtn.addEventListener('click', async () => {
@@ -40,6 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
               alert('Copy failed – press Ctrl‑C.');
             }
+          });
+        }
+        // Print button
+        const printBtn = document.getElementById('printBtn');
+        if (printBtn) {
+          printBtn.addEventListener('click', () => {
+            window.print();
           });
         }
 
