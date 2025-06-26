@@ -181,15 +181,25 @@
                 </div> 
             </section> 
                  <!-- Share / Copy‑link button -->
-                <button id="shareBtn"
-                        class="mt-6 inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                    <path d="M15 8a3 3 0 100-6 3 3 0 000 6zM9 22a3 3 0 100-6 3 3 0 000 6zM22 15a3 3 0 10-6 0 3 3 0 006 0z"/>
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M14.4 6.4L9.6 9.6M14.4 17.6L9.6 14.4"/>
-                  </svg>
-                  Copy link
-                </button>
+               <!-- Share / Copy-link and Print buttons -->
+                <div class="mt-6 flex flex-wrap gap-2">
+                  <button id="shareBtn"
+                          class="inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <!-- existing share icon -->
+                    Copy link
+                  </button>
+                
+                  <button id="printBtn"
+                          class="inline-flex items-center gap-2 rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600">
+                    <!-- Print icon (Heroicons outline) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-8 4h4m-4-4h4" />
+                    </svg>
+                    Print
+                  </button>
+                </div>
+
 
         </div> 
 
