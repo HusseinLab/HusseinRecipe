@@ -64,3 +64,8 @@
     /* This adds the subtle shadow you wanted */
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
+
+body.dark .category-filter-btn { background-color:#334155; color:#e2e8f0; }
+body.dark .category-filter-btn:hover { background-color:#475569; }
+body.dark .category-filter-btn-active,
+body.dark .category-filter-btn-active:hover { background-color:#6366f1; }
