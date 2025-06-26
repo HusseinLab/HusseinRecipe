@@ -42,7 +42,8 @@
     </style>
     <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
 </head>
-<body class="text-slate-800">
+<body class="min-h-screen flex flex-col bg-gray-50 text-slate-800
+             dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
 
     <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg sticky top-0 z-40">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -73,6 +74,14 @@
                                     class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-700 focus:ring-white transition-colors">
                                 Sign Out
                             </button>
+                            <!-- Theme toggle -->
+                            <button id="themeToggleBtn" title="Toggle dark mode"
+                                    class="p-2 rounded-md bg-white/20 hover:bg-white/30
+                                           dark:bg-white/10 dark:hover:bg-white/20
+                                           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400">
+                              <!-- JS will inject sun / moon icon -->
+                            </button>
+
                         </div>
                     </div>
                 </div>
