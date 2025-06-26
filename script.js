@@ -30,6 +30,20 @@ document.addEventListener('DOMContentLoaded', () => {
         measurementId: "G-ZWP1BKDXY4"
     };
 
+        // Share / copy‑link button
+        const shareBtn = document.getElementById('shareBtn');
+        if (shareBtn) {
+          shareBtn.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(window.location.href);
+              alert('Link copied to clipboard!');
+            } catch (err) {
+              alert('Copy failed – press Ctrl‑C.');
+            }
+          });
+        }
+
+
     // --- UI Elements ---
     const authStatusDiv = document.getElementById('authStatus');
     const googleSignInBtn = document.getElementById('googleSignInBtn');
@@ -103,6 +117,37 @@ document.addEventListener('DOMContentLoaded', () => {
             loadBrowseViewRecipes();
         }
     }
+
+                /**
+             * Tiny hash router.
+             * Accepts:
+             *   #/recipe/<docId>  → opens detail view
+             *   #/add             → opens “add recipe” form
+             *   (anything else)   → shows browse grid
+             */
+            function handleRoute () {
+              const hash = window.location.hash.slice(1);          // remove leading '#'
+              const [route, param] = hash.split('/').filter(Boolean);
+            
+              switch (route) {
+                case 'recipe':
+                  if (param) {
+                    navigateToRecipeDetail(param);   // existing Firestore fetch
+                    showView('recipeDetailView');
+                    return;
+                  }
+                  break;
+                case 'add':
+                  resetRecipeForm && resetRecipeForm(); // if this helper exists
+                  showView('recipeFormView');
+                  return;
+                default:
+                  // fall through
+              }
+              // Default fallback – browse grid
+              showView('browseView');
+            }
+
 
     function showMessage(element, userMessage, isError = false, duration = 4000, error = null) {
         if (!element) return;
@@ -340,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const card = document.createElement('div');
                 card.className = 'recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative'; // Added relative
                 card.dataset.id = recipeId;
-                card.addEventListener('click', () => navigateToRecipeDetail(recipeId));
+                card.addEventListener('click', () => { window.location.hash = `/recipe/${recipeId}`; });
 
                 const imageContainer = document.createElement('div');
                 imageContainer.className = 'h-48 w-full recipe-card-image-container';
@@ -404,7 +449,6 @@ document.addEventListener('DOMContentLoaded', () => {
         detailRecipeTagsContainer.classList.add('view-hidden');
         detailImagePlaceholder.innerHTML = `<svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`;
         
-        showView('recipeDetailView');
         try {
             const docSnap = await getDoc(doc(db, `artifacts/${appId}/users/${userId}/recipes`, recipeId));
             if (docSnap.exists()) {
@@ -487,6 +531,13 @@ document.addEventListener('DOMContentLoaded', () => {
         db = getFirestore(app);
         storage = getStorage(app);
         console.log("Firebase Initialized Successfully.");
+        // ──────────────────────────────────────────────
+        //  Simple hash‑router bootstrap
+        //  Fires once on load and on every #hash change
+        // ──────────────────────────────────────────────
+        window.addEventListener('hashchange', handleRoute);
+        document.addEventListener('DOMContentLoaded', handleRoute);
+
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
