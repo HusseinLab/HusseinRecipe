@@ -5,12 +5,16 @@ export function handleRoute() {
   const [route, param] = window.location.hash.slice(1).split("/").filter(Boolean);
   switch (route) {
     case "recipe":
-      if (param) {
-        navigateToRecipeDetail(param);
-        showView("recipeDetailView");
-        return;
-      }
-      break;
+     // only go to detail if we already know who’s signed in:
+     if (param && window.userId) {
+       navigateToRecipeDetail(param);
+       showView("recipeDetailView");
+       return;
+     }
+     // otherwise fall back to browse:
+     showView("browseView");
+      return;
+    
     case "add":
       resetRecipeForm();
       showView("recipeFormView");
