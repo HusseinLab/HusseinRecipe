@@ -116,6 +116,18 @@ export function loadBrowseViewRecipes() {
   );
 }
 
+const imageObserver = new IntersectionObserver((entries, obs) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const img = entry.target;
+    if (img.dataset.src) {
+      img.src = img.dataset.src;
+      delete img.dataset.src;
+    }
+    obs.unobserve(img);
+  });
+}, { rootMargin: '100px', threshold: 0.1 });
+
 // 5) Render the grid, with fuzzy/typo-tolerant search
 export function renderRecipes() {
   const grid = document.getElementById("recipesGridContainer");
@@ -165,10 +177,20 @@ export function renderRecipes() {
       const shimmer = document.createElement("div");
       shimmer.className = "absolute inset-0 bg-slate-200 animate-pulse";
       imgWrap.appendChild(shimmer);
+       // Eager-load first 20, otherwise defer via observer
+      if (i < 20) {
+        img.src = recipe.imageUrl;
+      } else {
+        imageObserver.observe(img);
+      }
+
+    grid.appendChild(card);
+  });
       const img = document.createElement("img");
-      img.src = recipe.imageUrl;
+      img.dataset.src = recipe.imageUrl;
       img.alt = recipe.title;
       img.className = "recipe-card-image hidden object-cover w-full h-full";
+      img.loading = "lazy";
       img.onload = () => {
         shimmer.remove();
         img.classList.remove("hidden");
