@@ -1,9 +1,5 @@
 // src/ui.js
 
-// ── 0) External Dependencies ───────────────────────────
-// Added Fuse.js for fuzzy/typo-tolerant search
-import Fuse from "https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.esm.js";
-
 import {
   db,
   collection,
@@ -22,7 +18,6 @@ import {
   marked
 } from "./firebase.js";
 
-// ── Shared constants & state ──────────────────────────
 const COMMON_INGREDIENTS = [
   "Flour","Sugar","Salt","Olive oil","Butter","Eggs",
   "Milk","Baking powder","Garlic","Onion","Tomato","Pepper",
@@ -33,9 +28,6 @@ const appId = typeof __app_id !== "undefined"
   ? __app_id
   : "default-recipe-app-id";
 
-// ──────────────────────────────────────────────────────────
-// 1) Populate the <datalist> for ingredient autocomplete
-// ──────────────────────────────────────────────────────────
 export function populateIngredientSuggestions() {
   const data = document.getElementById("ingredientSuggestions");
   if (!data) return;
@@ -43,12 +35,41 @@ export function populateIngredientSuggestions() {
     .map(ing => `<option value="${ing}">`)
     .join("");
 }
-// fire it on initial load
-document.addEventListener("DOMContentLoaded", populateIngredientSuggestions);
 
-// ──────────────────────────────────────────────────────────
-// 2) View switching
-// ──────────────────────────────────────────────────────────
+function getDragAfterElement(container, y) {
+  const draggableElements = [...container.querySelectorAll('.ingredient-item:not(.dragging)')];
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  populateIngredientSuggestions();
+  const container = document.getElementById("ingredientListDisplay");
+  if (container) {
+    container.addEventListener("dragover", e => {
+      e.preventDefault();
+      const dragging = container.querySelector('.dragging');
+      const afterElement = getDragAfterElement(container, e.clientY);
+      if (!afterElement) {
+        container.appendChild(dragging);
+      } else {
+        container.insertBefore(dragging, afterElement);
+      }
+    });
+    container.addEventListener("drop", () => {
+      window.currentIngredientsArray = Array.from(container.children)
+        .map(div => div.querySelector('span').textContent);
+    });
+  }
+});
+
 export function showView(viewIdToShow) {
   ["browseView","recipeDetailView","recipeFormView"].forEach((viewId) => {
     const el = document.getElementById(viewId);
@@ -61,9 +82,6 @@ export function showView(viewIdToShow) {
   }
 }
 
-// ──────────────────────────────────────────────────────────
-// 3) Reset / render ingredients in the form
-// ──────────────────────────────────────────────────────────
 export function resetRecipeForm() {
   const form = document.getElementById("recipeForm");
   form.reset();
@@ -80,9 +98,11 @@ export function renderIngredientList() {
   container.innerHTML = "";
   (window.currentIngredientsArray || []).forEach((ing, idx) => {
     const div = document.createElement("div");
-    div.className = "flex items-center justify-between bg-gray-100 p-2 pl-3 rounded-md text-sm";
-    div.innerHTML = `<span>${ing}</span>
-      <button title="Remove" class="ml-2 text-red-500 hover:text-red-700">&times;</button>`;
+    div.draggable = true;
+    div.className = "ingredient-item flex items-center justify-between bg-gray-100 p-2 pl-3 rounded-md text-sm";
+    div.innerHTML = `<span>${ing}</span><button title="Remove" class="ml-2 text-red-500 hover:text-red-700">&times;</button>`;
+    div.addEventListener("dragstart", () => div.classList.add("dragging"));
+    div.addEventListener("dragend", () => div.classList.remove("dragging"));
     div.querySelector("button").onclick = () => {
       window.currentIngredientsArray.splice(idx, 1);
       renderIngredientList();
@@ -91,9 +111,6 @@ export function renderIngredientList() {
   });
 }
 
-// ──────────────────────────────────────────────────────────
-// 4) Highlight active category button
-// ──────────────────────────────────────────────────────────
 export function updateCategoryButtonStyles() {
   document.querySelectorAll(".category-filter-btn").forEach((btn) => {
     btn.classList.toggle(
@@ -103,9 +120,6 @@ export function updateCategoryButtonStyles() {
   });
 }
 
-// ──────────────────────────────────────────────────────────
-// 5) Listen for recipe changes in Firestore
-// ──────────────────────────────────────────────────────────
 export function loadBrowseViewRecipes() {
   if (!window.userId) return;
   if (window.recipesUnsubscribe) {
@@ -132,18 +146,11 @@ export function loadBrowseViewRecipes() {
   );
 }
 
-// ──────────────────────────────────────────────────────────
-// 6) Render the grid, with fuzzy/typo-tolerant search
-// ──────────────────────────────────────────────────────────
 export function renderRecipes() {
   const grid = document.getElementById("recipesGridContainer");
   const placeholder = document.getElementById("recipesGridPlaceholder");
   if (!grid || !placeholder) return;
-
-  // remove only the cards, keep placeholder intact
   grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
-
-  // no data or not signed in?
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
@@ -151,38 +158,28 @@ export function renderRecipes() {
       : '<p class="text-center text-gray-500 py-8">Please sign in to see recipes.</p>';
     return;
   }
-
-  // gather recipes
   const allRecipes = window.lastRecipeSnapshot.docs.map(d => ({
     id: d.id,
     ...d.data()
   }));
-
-  // apply category filter
   let filtered = allRecipes.filter(r =>
-    window.currentCategoryFilter === "all" ||
-    r.category === window.currentCategoryFilter
+    window.currentCategoryFilter === "all" || r.category === window.currentCategoryFilter
   );
-
-  // fuzzy search via Fuse.js
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
     const fuse = new Fuse(filtered, {
-      keys: ["title","tags"],
+      keys: ["title", "tags"],
       threshold: 0.3,
       ignoreLocation: true
     });
     filtered = fuse.search(term).map(res => res.item);
   }
-
   let found = 0;
   filtered.forEach(recipe => {
     found++;
     const card = document.createElement("div");
     card.className = "recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative";
     card.onclick = () => window.location.hash = `/recipe/${recipe.id}`;
-
-    // image wrapper
     const imgWrap = document.createElement("div");
     imgWrap.className = "recipe-thumb recipe-card-image-container relative";
     if (recipe.imageUrl) {
@@ -201,11 +198,7 @@ export function renderRecipes() {
         shimmer.innerHTML = `<div class="flex items-center justify-center h-full text-slate-400">
           <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M4 16l4.586-4.586a2 2 0
-                 012.828 0L16 16m-2-2 1.586-1.586
-                 a2 2 0 012.828 0L20 14m-6-6h.01
-                 M6 20h12a2 2 0 002-2V6a2 2 0
-                 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
         </div>`;
       };
@@ -214,24 +207,16 @@ export function renderRecipes() {
       imgWrap.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-slate-200">
         <svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M4 16l4.586-4.586a2 2 0 
-               012.828 0L16 16m-2-2 1.586-1.586
-               a2 2 0 012.828 0L20 14m-6-6h.01
-               M6 20h12a2 2 0 002-2V6a2 2 0 
-               00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>`;
     }
-
-    // text overlay
     const content = document.createElement("div");
     content.className = "p-5 flex-grow flex flex-col";
     const original = document.createElement("div");
     original.className = "transition-opacity duration-300 group-hover:opacity-0";
     original.innerHTML = `
-      <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">
-        ${recipe.category || "Uncategorized"}
-      </p>
+      <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">${recipe.category || "Uncategorized"}</p>
       <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>
     `;
     const hoverText = document.createElement("div");
@@ -240,27 +225,20 @@ export function renderRecipes() {
       <p class="text-xs font-semibold uppercase tracking-wider">${recipe.category || "Uncategorized"}</p>
       <h3 class="text-xl font-bold leading-tight">${recipe.title}</h3>
     `;
-
     content.appendChild(original);
     card.appendChild(imgWrap);
     card.appendChild(content);
     card.appendChild(hoverText);
     grid.appendChild(card);
   });
-
-  // no matches?
   placeholder.style.display = found === 0 ? "block" : "none";
   if (found === 0) {
     placeholder.innerHTML = '<p class="text-center text-gray-500 py-8">No recipes found.</p>';
   }
 }
 
-// ──────────────────────────────────────────────────────────
-// 7) Detail view
-// ──────────────────────────────────────────────────────────
 export async function navigateToRecipeDetail(recipeId) {
   window.currentRecipeIdInDetailView = recipeId;
-  // reset placeholders…
   document.getElementById("detailRecipeTitle").textContent = "Loading…";
   document.getElementById("detailRecipeCategory").textContent = "";
   document.getElementById("detailRecipeTags").innerHTML = "";
@@ -272,12 +250,7 @@ export async function navigateToRecipeDetail(recipeId) {
   document.getElementById("detailImagePlaceholder").innerHTML = `
     <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-        d="M4 16l4.586-4.586a2 2 0 
-           012.828 0L16 16m-2-2l1.586-1.586a2 
-           2 0 012.828 0L20 14m-6-6h.01
-           M6 20h12a2 2 0 002-2V6
-           a2 2 0 00-2-2H6a2 2 0
-           00-2 2v12a2 2 0 002 2z"/>
+        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
     </svg>`;
   try {
     const snap = await getDoc(
@@ -292,17 +265,13 @@ export async function navigateToRecipeDetail(recipeId) {
     document.getElementById("detailRecipeTitle").textContent = r.title;
     document.getElementById("detailRecipeCategory").textContent = r.category;
     if (r.imageUrl) {
-      document.getElementById("detailImagePlaceholder").innerHTML = `
-        <img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">
-      `;
+      document.getElementById("detailImagePlaceholder").innerHTML = `<img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">`;
     }
     document.getElementById("detailRecipeIngredients").innerHTML = r.ingredients.map(i => `<li>${i}</li>`).join("");
     document.getElementById("detailRecipeDirections").innerHTML = r.directions.map(d => `<li>${d}</li>`).join("");
     if (r.tags?.length) {
       document.getElementById("detailRecipeTagsContainer").classList.remove("view-hidden");
-      document.getElementById("detailRecipeTags").innerHTML = r.tags
-        .map(t => `<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">${t}</span>`)
-        .join("");
+      document.getElementById("detailRecipeTags").innerHTML = r.tags.map(t => `<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">${t}</span>`).join("");
     }
     if (r.notes?.trim()) {
       document.getElementById("detailRecipeNotesContainer").classList.remove("view-hidden");
@@ -313,9 +282,6 @@ export async function navigateToRecipeDetail(recipeId) {
   }
 }
 
-// ──────────────────────────────────────────────────────────
-// 8) Populate form to edit
-// ──────────────────────────────────────────────────────────
 export async function populateFormForEdit(recipeId) {
   try {
     const snap = await getDoc(
@@ -347,9 +313,6 @@ export async function populateFormForEdit(recipeId) {
   }
 }
 
-// ──────────────────────────────────────────────────────────
-// 9) Delete a recipe
-// ──────────────────────────────────────────────────────────
 export async function handleDeleteRecipe() {
   const id = window.currentRecipeIdInDetailView;
   if (!id) return;
@@ -364,9 +327,6 @@ export async function handleDeleteRecipe() {
   }
 }
 
-// ──────────────────────────────────────────────────────────
-// 10) Save (add or update) recipe
-// ──────────────────────────────────────────────────────────
 export async function handleRecipeFormSubmit(event) {
   event.preventDefault();
   const titleValue    = document.getElementById("recipeTitleInput").value.trim();
@@ -376,13 +336,11 @@ export async function handleRecipeFormSubmit(event) {
   const tagsText      = document.getElementById("recipeTagsInput").value.trim();
   const recipeIdToEdit= document.getElementById("recipeIdInput").value;
   if (!titleValue || !categoryValue || (window.currentIngredientsArray||[]).length === 0 || !directions) {
-    showMessage(document.getElementById("errorMessage"),
-      "Title, Category, at least one Ingredient, and Directions are required.", true);
+    showMessage(document.getElementById("errorMessage"), "Title, Category, at least one Ingredient, and Directions are required.", true);
     return;
   }
   const loadingEl = document.getElementById("loadingIndicator");
   loadingEl.classList.remove("hidden");
-
   try {
     let imageUrlToSave;
     const previewEl = document.getElementById("imagePreview");
@@ -397,7 +355,6 @@ export async function handleRecipeFormSubmit(event) {
     } else if (recipeIdToEdit) {
       imageUrlToSave = previewEl.src.startsWith("http") ? previewEl.src : null;
     }
-
     const data = {
       title: titleValue,
       category: categoryValue,
@@ -407,7 +364,6 @@ export async function handleRecipeFormSubmit(event) {
       tags: tagsText.split(",").map(s => s.trim()).filter(Boolean)
     };
     const col = collection(db, `artifacts/${appId}/users/${window.userId}/recipes`);
-
     if (recipeIdToEdit) {
       const toUpdate = { ...data, lastUpdatedAt: Timestamp.now() };
       if (imageUrlToSave !== undefined) toUpdate.imageUrl = imageUrlToSave;
@@ -419,7 +375,6 @@ export async function handleRecipeFormSubmit(event) {
       await addDoc(col, toAdd);
       showMessage(document.getElementById("successMessage"), "Recipe added successfully!");
     }
-
     resetRecipeForm();
     showView("browseView");
   } catch (err) {
@@ -429,17 +384,10 @@ export async function handleRecipeFormSubmit(event) {
   }
 }
 
-// ──────────────────────────────────────────────────────────
-// 11) Generic toast messages
-// ──────────────────────────────────────────────────────────
 export function showMessage(element, userMessage, isError = false, duration = 4000) {
   if (isError) console.error(userMessage);
   element.textContent = userMessage;
-  element.className = `
-    p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg
-    ${isError ? "bg-red-500" : "bg-green-500"}`
-    .replace(/\s+/g, " ")
-    .trim();
+  element.className = `p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg ${isError ? "bg-red-500" : "bg-green-500"}`;
   element.classList.remove("hidden");
   setTimeout(() => element.classList.add("hidden"), duration);
 }
