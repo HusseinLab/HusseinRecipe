@@ -208,3 +208,32 @@ html.dark .border-slate-300 {
     color: #000 !important;
   }
 }
+
+/*──────────────────────────────────────────────────────────────
+  Ingredient list items
+──────────────────────────────────────────────────────────────*/
+.ingredient-item {
+  border: 1px solid #e2e8f0;    /* light gray border */
+  border-radius: 0.375rem;      /* rounded corners */
+  margin-bottom: 0.5rem;        /* spacing between items */
+  padding: 0.5rem 1rem;         /* inner padding */
+  background-color: #fff;       /* white background */
+  transition: background-color .2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Hover state */
+.ingredient-item:hover {
+  background-color: #f1f5f9;    /* subtle blue‐gray on hover */
+}
+
+/* Make sure the remove button stands out */
+.ingredient-item button {
+  font-size: 1rem;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
