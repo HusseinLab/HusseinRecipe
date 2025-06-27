@@ -118,7 +118,7 @@ export function loadBrowseViewRecipes() {
 }
 
 // ──────────────────────────────────────────────────────────
-// 5) Render your recipe-grid
+// 5) Render your recipe-grid with fuzzy/typo-tolerant search
 // ──────────────────────────────────────────────────────────
 export function renderRecipes() {
   const grid = document.getElementById("recipesGridContainer");
@@ -128,39 +128,37 @@ export function renderRecipes() {
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
-      ? '' // You can keep your skeleton here
+      ? '' 
       : '<p class="text-center text-gray-500 py-8">Please sign in to see recipes.</p>';
     return;
   }
 
+  // Collect all recipes
+  const allRecipes = window.lastRecipeSnapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  // Apply category filter
+  let filtered = allRecipes.filter((r) =>
+    currentCategoryFilter === "all" || r.category === currentCategoryFilter
+  );
+
+  // Fuzzy search via Fuse.js if a term exists
+  const term = (document.getElementById("headerSearchInput").value || "").trim();
+  if (term) {
+    const fuse = new Fuse(filtered, {
+      keys: ["title", "tags"],
+      threshold: 0.3,
+      ignoreLocation: true
+    });
+    filtered = fuse.search(term).map((result) => result.item);
+  }
+
   let found = 0;
-  const term = (
-    document.getElementById("headerSearchInput").value ||
-    ""
-  )
-    .toLowerCase()
-    .trim();
-
-  window.lastRecipeSnapshot.forEach((docSnap) => {
-    const recipe = docSnap.data();
-    const id = docSnap.id;
-
-    if (
-      currentCategoryFilter !== "all" &&
-      recipe.category !== currentCategoryFilter
-    ) {
-      return;
-    }
-
-    const matches =
-      term === "" ||
-      recipe.title.toLowerCase().includes(term) ||
-      (recipe.tags || []).some((t) =>
-        t.toLowerCase().includes(term)
-      );
-
-    if (!matches) return;
+  filtered.forEach((recipe) => {
     found++;
+    const id = recipe.id;
 
     // Card container
     const card = document.createElement("div");
@@ -170,7 +168,7 @@ export function renderRecipes() {
       window.location.hash = `/recipe/${id}`;
     };
 
-    // Image container with shimmer + load
+    // Image container with shimmer
     const imgWrap = document.createElement("div");
     imgWrap.className = "recipe-thumb recipe-card-image-container relative";
     if (recipe.imageUrl) {
@@ -190,10 +188,11 @@ export function renderRecipes() {
         shimmer.innerHTML = `<div class="flex items-center justify-center h-full text-slate-400">
           <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 
-                 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01
-                 M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6
-                 a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              d="M4 16l4.586-4.586a2 2 0
+                 012.828 0L16 16m-2-2 1.586-1.586
+                 a2 2 0 012.828 0L20 14m-6-6h.01
+                 M6 20h12a2 2 0 002-2V6a2 2 0
+                 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
         </div>`;
       };
@@ -202,12 +201,11 @@ export function renderRecipes() {
       imgWrap.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-slate-200">
         <svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M4 16l4.586-4.586a2 2 0 012.828 0
-               L16 16m-2-2 1.586-1.586a2 2 0 
-               012.828 0L20 14m-6-6h.01M6 20h12
-               a2 2 0 002-2V6a2 2 0 00-2-2H6
-               a2 2 0 00-2 2v12a2 2 0 
-               002 2z"/>
+            d="M4 16l4.586-4.586a2 2 0 
+               012.828 0L16 16m-2-2 1.586-1.586
+               a2 2 0 012.828 0L20 14m-6-6h.01
+               M6 20h12a2 2 0 002-2V6a2 2 0 
+               00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>`;
     }
@@ -216,7 +214,7 @@ export function renderRecipes() {
     const content = document.createElement("div");
     content.className = "p-5 flex-grow flex flex-col";
 
-    // Static text
+    // Original text
     const original = document.createElement("div");
     original.className = "transition-opacity duration-300 group-hover:opacity-0";
     original.innerHTML = `
@@ -228,7 +226,7 @@ export function renderRecipes() {
       </h3>
     `;
 
-    // Hover overlay text
+    // Hover overlay
     const hoverText = document.createElement("div");
     hoverText.className =
       "absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none w-full";
@@ -245,7 +243,7 @@ export function renderRecipes() {
     card.appendChild(imgWrap);
     card.appendChild(content);
     card.appendChild(hoverText);
-    document.getElementById("recipesGridContainer").appendChild(card);
+    grid.appendChild(card);
   });
 
   placeholder.style.display = found === 0 ? "block" : "none";
@@ -261,7 +259,6 @@ export function renderRecipes() {
 export async function navigateToRecipeDetail(recipeId) {
   window.currentRecipeIdInDetailView = recipeId;
 
-  // Reset placeholders
   document.getElementById("detailRecipeTitle").textContent = "Loading…";
   document.getElementById("detailRecipeCategory").textContent = "";
   document.getElementById("detailRecipeTags").innerHTML = "";
@@ -425,7 +422,79 @@ export async function handleDeleteRecipe() {
 // ──────────────────────────────────────────────────────────
 export async function handleRecipeFormSubmit(event) {
   event.preventDefault();
-  // ... copy your existing handleRecipeFormSubmit() logic here ...
+  const titleValue = document.getElementById("recipeTitleInput").value.trim();
+  const categoryValue = document.getElementById("recipeCategoryInput").value;
+  const directionsText = document
+    .getElementById("recipeDirectionsInput")
+    .value.trim();
+  const notesValue = document.getElementById("recipeNotesInput").value.trim();
+  const tagsText = document.getElementById("recipeTagsInput").value.trim();
+  const recipeIdToEdit = document.getElementById("recipeIdInput").value;
+  if (!titleValue || !categoryValue || currentIngredientsArray.length === 0 || !directionsText) {
+    showMessage(
+      document.getElementById("errorMessage"),
+      "Title, Category, at least one Ingredient, and Directions are required.",
+      true
+    );
+    return;
+  }
+  const successMsgEl = document.getElementById("successMessage");
+  const errorMsgEl = document.getElementById("errorMessage");
+  const loadingEl = document.getElementById("loadingIndicator");
+  loadingEl.classList.remove("hidden");
+  try {
+    let imageUrlToSave;
+    const previewEl = document.getElementById("imagePreview");
+    if (previewEl.src && previewEl.src.startsWith("blob:")) {
+      const fileInput = document.getElementById("recipeImageInput");
+      const file = fileInput.files[0];
+      const imageName = `${window.userId}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const path = `recipe_images/${window.userId}/${imageName}`;
+      const ref = storageRef(storage, path);
+      const uploadTask = uploadBytesResumable(ref, file);
+      await new Promise((res, rej) => {
+        uploadTask.on(
+          "state_changed",
+          null,
+          rej,
+          () => res()
+        );
+      });
+      imageUrlToSave = await getDownloadURL(uploadTask.snapshot.ref);
+    } else if (recipeIdToEdit) {
+      imageUrlToSave = previewEl.src.startsWith("http") ? previewEl.src : null;
+    }
+    const data = {
+      title: titleValue,
+      category: categoryValue,
+      ingredients: [...currentIngredientsArray],
+      directions: directionsText.split("\n").map(s => s.trim()).filter(Boolean),
+      notes: notesValue,
+      tags: tagsText.split(",").map(s => s.trim()).filter(Boolean)
+    };
+    const col = collection(db, `artifacts/${appId}/users/${window.userId}/recipes`);
+    if (recipeIdToEdit) {
+      const updateData = { ...data, lastUpdatedAt: Timestamp.now() };
+      if (imageUrlToSave !== undefined) updateData.imageUrl = imageUrlToSave;
+      await updateDoc(doc(col, recipeIdToEdit), updateData);
+      showMessage(successMsgEl, "Recipe updated successfully!");
+    } else {
+      const addData = { ...data, userId: window.userId, createdAt: Timestamp.now() };
+      if (imageUrlToSave) addData.imageUrl = imageUrlToSave;
+      await addDoc(col, addData);
+      showMessage(successMsgEl, "Recipe added successfully!");
+    }
+    resetRecipeForm();
+    showView("browseView");
+  } catch (err) {
+    showMessage(
+      document.getElementById("errorMessage"),
+      `Error saving recipe: ${err.message}`,
+      true
+    );
+  } finally {
+    loadingEl.classList.add("hidden");
+  }
 }
 
 // ──────────────────────────────────────────────────────────
