@@ -21,6 +21,13 @@ import {
 // ──────────────────────────────────────────────────────────
 // Shared constants & state
 // ──────────────────────────────────────────────────────────
+
+const COMMON_INGREDIENTS = [
+  "Flour","Sugar","Salt","Olive oil","Butter","Eggs",
+  "Milk","Baking powder","Garlic","Onion","Tomato","Pepper",
+  "Chicken breast","Ground beef","Rice","Pasta","Herbs","Spices"
+];
+
 const appId = typeof __app_id !== "undefined"
   ? __app_id
   : "default-recipe-app-id";
@@ -29,6 +36,16 @@ const views = ["browseView", "recipeDetailView", "recipeFormView"];
 let currentIngredientsArray = [];
 let currentCategoryFilter = "all";
 
+
+function populateIngredientSuggestions() {
+  const data = document.getElementById("ingredientSuggestions");
+  if (!data) return;
+  data.innerHTML = COMMON_INGREDIENTS
+    .map(ing => `<option value="${ing}">`)
+    .join("");
+}
+
+document.addEventListener("DOMContentLoaded", populateIngredientSuggestions);
 // ──────────────────────────────────────────────────────────
 // 1) Toggle between your three views
 // ──────────────────────────────────────────────────────────
