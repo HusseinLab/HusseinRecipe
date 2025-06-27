@@ -138,9 +138,10 @@ export function loadBrowseViewRecipes() {
 // 5) Render your recipe-grid with fuzzy/typo-tolerant search
 // ──────────────────────────────────────────────────────────
 export function renderRecipes() {
-  const grid = document.getElementById("recipesGridContainer");
-  const placeholder = document.getElementById("recipesGridPlaceholder");
-  grid.innerHTML = "";
+const grid = document.getElementById("recipesGridContainer");
+const placeholder = document.getElementById("recipesGridPlaceholder");
+// remove only the cards, leave placeholder in place:
+grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
 
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
