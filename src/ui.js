@@ -111,6 +111,19 @@ export function renderIngredientList() {
   });
 }
 
+const ingredientListEl = document.getElementById("ingredientListDisplay");
+if (ingredientListEl && window.Sortable) {
+  new Sortable(ingredientListEl, {
+    animation: 150,
+    onEnd: (evt) => {
+      // idx: new index, oldIndex: previous index
+      const moved = window.currentIngredientsArray.splice(evt.oldIndex, 1)[0];
+      window.currentIngredientsArray.splice(evt.newIndex, 0, moved);
+      renderIngredientList();
+    }
+  });
+}
+
 export function updateCategoryButtonStyles() {
   document.querySelectorAll(".category-filter-btn").forEach((btn) => {
     btn.classList.toggle(
