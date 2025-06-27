@@ -36,7 +36,6 @@ const views = ["browseView", "recipeDetailView", "recipeFormView"];
 let currentIngredientsArray = [];
 let currentCategoryFilter = "all";
 
-
 function populateIngredientSuggestions() {
   const data = document.getElementById("ingredientSuggestions");
   if (!data) return;
@@ -46,6 +45,7 @@ function populateIngredientSuggestions() {
 }
 
 document.addEventListener("DOMContentLoaded", populateIngredientSuggestions);
+
 // ──────────────────────────────────────────────────────────
 // 1) Toggle between your three views
 // ──────────────────────────────────────────────────────────
@@ -138,31 +138,30 @@ export function loadBrowseViewRecipes() {
 // 5) Render your recipe-grid with fuzzy/typo-tolerant search
 // ──────────────────────────────────────────────────────────
 export function renderRecipes() {
-const grid = document.getElementById("recipesGridContainer");
-const placeholder = document.getElementById("recipesGridPlaceholder");
-// remove only the cards, leave placeholder in place:
-grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
+  const grid = document.getElementById("recipesGridContainer");
+  const placeholder = document.getElementById("recipesGridPlaceholder");
+
+  // Remove only the existing recipe cards; leave the placeholder intact
+  grid.querySelectorAll(".recipe-card").forEach((c) => c.remove());
 
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
-      ? '' 
+      ? "" 
       : '<p class="text-center text-gray-500 py-8">Please sign in to see recipes.</p>';
     return;
   }
 
-  // Collect all recipes
+  // Gather, filter and fuzzy-search your recipes
   const allRecipes = window.lastRecipeSnapshot.docs.map((d) => ({
     id: d.id,
     ...d.data()
   }));
 
-  // Apply category filter
   let filtered = allRecipes.filter((r) =>
     currentCategoryFilter === "all" || r.category === currentCategoryFilter
   );
 
-  // Fuzzy search via Fuse.js if a term exists
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
     const fuse = new Fuse(filtered, {
@@ -170,7 +169,7 @@ grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
       threshold: 0.3,
       ignoreLocation: true
     });
-    filtered = fuse.search(term).map((result) => result.item);
+    filtered = fuse.search(term).map((res) => res.item);
   }
 
   let found = 0;
@@ -186,7 +185,7 @@ grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
       window.location.hash = `/recipe/${id}`;
     };
 
-    // Image container with shimmer
+    // Image + shimmer
     const imgWrap = document.createElement("div");
     imgWrap.className = "recipe-thumb recipe-card-image-container relative";
     if (recipe.imageUrl) {
@@ -232,7 +231,7 @@ grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
     const content = document.createElement("div");
     content.className = "p-5 flex-grow flex flex-col";
 
-    // Original text
+    // Static text
     const original = document.createElement("div");
     original.className = "transition-opacity duration-300 group-hover:opacity-0";
     original.innerHTML = `
@@ -244,7 +243,7 @@ grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
       </h3>
     `;
 
-    // Hover overlay
+    // Hover text overlay
     const hoverText = document.createElement("div");
     hoverText.className =
       "absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none w-full";
@@ -264,6 +263,7 @@ grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
     grid.appendChild(card);
   });
 
+  // Show or hide placeholder based on whether we found any recipes
   placeholder.style.display = found === 0 ? "block" : "none";
   if (found === 0) {
     placeholder.innerHTML =
@@ -362,7 +362,7 @@ export async function navigateToRecipeDetail(recipeId) {
 }
 
 // ──────────────────────────────────────────────────────────
-// 7) Edit form population
+// 7) Edit-form population
 // ──────────────────────────────────────────────────────────
 export async function populateFormForEdit(recipeId) {
   try {
@@ -440,6 +440,7 @@ export async function handleDeleteRecipe() {
 // ──────────────────────────────────────────────────────────
 export async function handleRecipeFormSubmit(event) {
   event.preventDefault();
+
   const titleValue = document.getElementById("recipeTitleInput").value.trim();
   const categoryValue = document.getElementById("recipeCategoryInput").value;
   const directionsText = document
@@ -448,7 +449,13 @@ export async function handleRecipeFormSubmit(event) {
   const notesValue = document.getElementById("recipeNotesInput").value.trim();
   const tagsText = document.getElementById("recipeTagsInput").value.trim();
   const recipeIdToEdit = document.getElementById("recipeIdInput").value;
-  if (!titleValue || !categoryValue || currentIngredientsArray.length === 0 || !directionsText) {
+
+  if (
+    !titleValue ||
+    !categoryValue ||
+    currentIngredientsArray.length === 0 ||
+    !directionsText
+  ) {
     showMessage(
       document.getElementById("errorMessage"),
       "Title, Category, at least one Ingredient, and Directions are required.",
@@ -456,52 +463,60 @@ export async function handleRecipeFormSubmit(event) {
     );
     return;
   }
+
   const successMsgEl = document.getElementById("successMessage");
-  const errorMsgEl = document.getElementById("errorMessage");
-  const loadingEl = document.getElementById("loadingIndicator");
+  const errorMsgEl   = document.getElementById("errorMessage");
+  const loadingEl    = document.getElementById("loadingIndicator");
   loadingEl.classList.remove("hidden");
+
   try {
     let imageUrlToSave;
     const previewEl = document.getElementById("imagePreview");
-    if (previewEl.src && previewEl.src.startsWith("blob:")) {
+    if (previewEl.src.startsWith("blob:")) {
       const fileInput = document.getElementById("recipeImageInput");
-      const file = fileInput.files[0];
-      const imageName = `${window.userId}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-      const path = `recipe_images/${window.userId}/${imageName}`;
-      const ref = storageRef(storage, path);
-      const uploadTask = uploadBytesResumable(ref, file);
+      const file      = fileInput.files[0];
+      const imageName = `${window.userId}_${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
+      const path      = `recipe_images/${window.userId}/${imageName}`;
+      const ref       = storageRef(storage, path);
+      const uploadTask= uploadBytesResumable(ref, file);
       await new Promise((res, rej) => {
-        uploadTask.on(
-          "state_changed",
-          null,
-          rej,
-          () => res()
-        );
+        uploadTask.on("state_changed", null, rej, () => res());
       });
       imageUrlToSave = await getDownloadURL(uploadTask.snapshot.ref);
     } else if (recipeIdToEdit) {
       imageUrlToSave = previewEl.src.startsWith("http") ? previewEl.src : null;
     }
+
     const data = {
-      title: titleValue,
-      category: categoryValue,
+      title:       titleValue,
+      category:    categoryValue,
       ingredients: [...currentIngredientsArray],
-      directions: directionsText.split("\n").map(s => s.trim()).filter(Boolean),
-      notes: notesValue,
-      tags: tagsText.split(",").map(s => s.trim()).filter(Boolean)
+      directions:  directionsText.split("\n").map(s => s.trim()).filter(Boolean),
+      notes:       notesValue,
+      tags:        tagsText.split(",").map(s => s.trim()).filter(Boolean)
     };
-    const col = collection(db, `artifacts/${appId}/users/${window.userId}/recipes`);
+
+    const col = collection(
+      db,
+      `artifacts/${appId}/users/${window.userId}/recipes`
+    );
+
     if (recipeIdToEdit) {
       const updateData = { ...data, lastUpdatedAt: Timestamp.now() };
       if (imageUrlToSave !== undefined) updateData.imageUrl = imageUrlToSave;
       await updateDoc(doc(col, recipeIdToEdit), updateData);
       showMessage(successMsgEl, "Recipe updated successfully!");
     } else {
-      const addData = { ...data, userId: window.userId, createdAt: Timestamp.now() };
+      const addData = {
+        ...data,
+        userId:    window.userId,
+        createdAt: Timestamp.now()
+      };
       if (imageUrlToSave) addData.imageUrl = imageUrlToSave;
       await addDoc(col, addData);
       showMessage(successMsgEl, "Recipe added successfully!");
     }
+
     resetRecipeForm();
     showView("browseView");
   } catch (err) {
