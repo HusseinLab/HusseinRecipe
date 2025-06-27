@@ -1,5 +1,9 @@
 // src/ui.js
 
+// ── 0) External Dependencies ───────────────────────────
+// Added Fuse.js for fuzzy/typo-tolerant search
+import Fuse from "https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.esm.js";
+
 import {
   db,
   collection,
@@ -18,10 +22,7 @@ import {
   marked
 } from "./firebase.js";
 
-// ──────────────────────────────────────────────────────────
-// Shared constants & state are now on window.*
-// ──────────────────────────────────────────────────────────
-
+// ── Shared constants & state ──────────────────────────
 const COMMON_INGREDIENTS = [
   "Flour","Sugar","Salt","Olive oil","Butter","Eggs",
   "Milk","Baking powder","Garlic","Onion","Tomato","Pepper",
@@ -33,7 +34,7 @@ const appId = typeof __app_id !== "undefined"
   : "default-recipe-app-id";
 
 // ──────────────────────────────────────────────────────────
-// 0) Populate the <datalist> for ingredient autocomplete
+// 1) Populate the <datalist> for ingredient autocomplete
 // ──────────────────────────────────────────────────────────
 export function populateIngredientSuggestions() {
   const data = document.getElementById("ingredientSuggestions");
@@ -42,12 +43,11 @@ export function populateIngredientSuggestions() {
     .map(ing => `<option value="${ing}">`)
     .join("");
 }
-
 // fire it on initial load
 document.addEventListener("DOMContentLoaded", populateIngredientSuggestions);
 
 // ──────────────────────────────────────────────────────────
-// 1) View switching
+// 2) View switching
 // ──────────────────────────────────────────────────────────
 export function showView(viewIdToShow) {
   ["browseView","recipeDetailView","recipeFormView"].forEach((viewId) => {
@@ -62,7 +62,7 @@ export function showView(viewIdToShow) {
 }
 
 // ──────────────────────────────────────────────────────────
-// 2) Reset / render ingredients in the form
+// 3) Reset / render ingredients in the form
 // ──────────────────────────────────────────────────────────
 export function resetRecipeForm() {
   const form = document.getElementById("recipeForm");
@@ -92,7 +92,7 @@ export function renderIngredientList() {
 }
 
 // ──────────────────────────────────────────────────────────
-// 3) Highlight active category button
+// 4) Highlight active category button
 // ──────────────────────────────────────────────────────────
 export function updateCategoryButtonStyles() {
   document.querySelectorAll(".category-filter-btn").forEach((btn) => {
@@ -104,7 +104,7 @@ export function updateCategoryButtonStyles() {
 }
 
 // ──────────────────────────────────────────────────────────
-// 4) Listen for recipe changes in Firestore
+// 5) Listen for recipe changes in Firestore
 // ──────────────────────────────────────────────────────────
 export function loadBrowseViewRecipes() {
   if (!window.userId) return;
@@ -133,42 +133,42 @@ export function loadBrowseViewRecipes() {
 }
 
 // ──────────────────────────────────────────────────────────
-// 5) Render the grid, with fuzzy/typo-tolerant search
+// 6) Render the grid, with fuzzy/typo-tolerant search
 // ──────────────────────────────────────────────────────────
 export function renderRecipes() {
   const grid = document.getElementById("recipesGridContainer");
   const placeholder = document.getElementById("recipesGridPlaceholder");
-  if (!grid || !placeholder) return;  // guard
+  if (!grid || !placeholder) return;
 
-  // only remove the cards, keep placeholder container intact
+  // remove only the cards, keep placeholder intact
   grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
 
-  // if no data or not signed in, show placeholder
+  // no data or not signed in?
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
-      ? '' 
+      ? ''
       : '<p class="text-center text-gray-500 py-8">Please sign in to see recipes.</p>';
     return;
   }
 
-  // build array of all recipes
+  // gather recipes
   const allRecipes = window.lastRecipeSnapshot.docs.map(d => ({
     id: d.id,
     ...d.data()
   }));
 
-  // category filter
+  // apply category filter
   let filtered = allRecipes.filter(r =>
     window.currentCategoryFilter === "all" ||
     r.category === window.currentCategoryFilter
   );
 
-  // fuzzy search via Fuse.js if a term is present
+  // fuzzy search via Fuse.js
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
     const fuse = new Fuse(filtered, {
-      keys: ["title", "tags"],
+      keys: ["title","tags"],
       threshold: 0.3,
       ignoreLocation: true
     });
@@ -182,7 +182,7 @@ export function renderRecipes() {
     card.className = "recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative";
     card.onclick = () => window.location.hash = `/recipe/${recipe.id}`;
 
-    // image container
+    // image wrapper
     const imgWrap = document.createElement("div");
     imgWrap.className = "recipe-thumb recipe-card-image-container relative";
     if (recipe.imageUrl) {
@@ -248,7 +248,7 @@ export function renderRecipes() {
     grid.appendChild(card);
   });
 
-  // show “no recipes” if nothing matched
+  // no matches?
   placeholder.style.display = found === 0 ? "block" : "none";
   if (found === 0) {
     placeholder.innerHTML = '<p class="text-center text-gray-500 py-8">No recipes found.</p>';
@@ -256,12 +256,11 @@ export function renderRecipes() {
 }
 
 // ──────────────────────────────────────────────────────────
-// 6) Detail view
+// 7) Detail view
 // ──────────────────────────────────────────────────────────
 export async function navigateToRecipeDetail(recipeId) {
   window.currentRecipeIdInDetailView = recipeId;
-
-  // reset placeholders
+  // reset placeholders…
   document.getElementById("detailRecipeTitle").textContent = "Loading…";
   document.getElementById("detailRecipeCategory").textContent = "";
   document.getElementById("detailRecipeTags").innerHTML = "";
@@ -280,7 +279,6 @@ export async function navigateToRecipeDetail(recipeId) {
            a2 2 0 00-2-2H6a2 2 0
            00-2 2v12a2 2 0 002 2z"/>
     </svg>`;
-
   try {
     const snap = await getDoc(
       doc(db, `artifacts/${appId}/users/${window.userId}/recipes`, recipeId)
@@ -316,7 +314,7 @@ export async function navigateToRecipeDetail(recipeId) {
 }
 
 // ──────────────────────────────────────────────────────────
-// 7) Populate form to edit
+// 8) Populate form to edit
 // ──────────────────────────────────────────────────────────
 export async function populateFormForEdit(recipeId) {
   try {
@@ -350,7 +348,7 @@ export async function populateFormForEdit(recipeId) {
 }
 
 // ──────────────────────────────────────────────────────────
-// 8) Delete a recipe
+// 9) Delete a recipe
 // ──────────────────────────────────────────────────────────
 export async function handleDeleteRecipe() {
   const id = window.currentRecipeIdInDetailView;
@@ -367,7 +365,7 @@ export async function handleDeleteRecipe() {
 }
 
 // ──────────────────────────────────────────────────────────
-// 9) Save (add or update) recipe
+// 10) Save (add or update) recipe
 // ──────────────────────────────────────────────────────────
 export async function handleRecipeFormSubmit(event) {
   event.preventDefault();
@@ -432,7 +430,7 @@ export async function handleRecipeFormSubmit(event) {
 }
 
 // ──────────────────────────────────────────────────────────
-// 10) Generic toast
+// 11) Generic toast messages
 // ──────────────────────────────────────────────────────────
 export function showMessage(element, userMessage, isError = false, duration = 4000) {
   if (isError) console.error(userMessage);
