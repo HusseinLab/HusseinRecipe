@@ -222,6 +222,11 @@ html.dark .border-slate-300 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  cursor: grab;
+}
+
+.ingredient-item:active {
+  cursor: grabbing;
 }
 
 /* Hover state */
