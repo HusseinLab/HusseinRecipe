@@ -18,10 +18,7 @@ import {
   marked
 } from "./firebase.js";
 import Sortable from "https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/modular/sortable.esm.js";
-
-// default filter & ingredients array so we show “All Recipes” on first load
-window.currentCategoryFilter    = "all";
-window.currentIngredientsArray  = [];
+import Fuse from "https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.esm.js";
 
 const COMMON_INGREDIENTS = [
   "Flour","Sugar","Salt","Olive oil","Butter","Eggs",
@@ -33,7 +30,7 @@ const appId = typeof __app_id !== "undefined"
   ? __app_id
   : "default-recipe-app-id";
 
-// 0) Populate <datalist> for ingredient autocomplete
+// 0) Populate datalist for ingredients
 export function populateIngredientSuggestions() {
   const data = document.getElementById("ingredientSuggestions");
   if (!data) return;
@@ -43,18 +40,18 @@ export function populateIngredientSuggestions() {
 }
 document.addEventListener("DOMContentLoaded", populateIngredientSuggestions);
 
-// 1) View switching
+// 1) Switch between Browse / Detail / Form
 export function showView(viewIdToShow) {
   ["browseView","recipeDetailView","recipeFormView"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.classList.toggle("view-active",   id === viewIdToShow);
-    el.classList.toggle("view-hidden",   id !== viewIdToShow);
+    el.classList.toggle("view-active", id === viewIdToShow);
+    el.classList.toggle("view-hidden", id !== viewIdToShow);
   });
   if (viewIdToShow === "browseView") loadBrowseViewRecipes();
 }
 
-// 2) Reset form & render ingredients
+// 2) Reset form & ingredients list
 export function resetRecipeForm() {
   document.getElementById("recipeForm").reset();
   document.getElementById("recipeIdInput").value = "";
@@ -82,7 +79,7 @@ export function renderIngredientList() {
   });
 }
 
-// 3) Highlight active category button
+// 3) Highlight active category (including "favorites")
 export function updateCategoryButtonStyles() {
   document.querySelectorAll(".category-filter-btn").forEach(btn => {
     btn.classList.toggle(
@@ -92,11 +89,13 @@ export function updateCategoryButtonStyles() {
   });
 }
 
-// 4) Firestore listener for recipes
+// 4) Firestore listener
 export function loadBrowseViewRecipes() {
   if (!window.userId) return;
-  if (window.recipesUnsubscribe) return renderRecipes();
-
+  if (window.recipesUnsubscribe) {
+    renderRecipes();
+    return;
+  }
   const q = query(
     collection(db, `artifacts/${appId}/users/${window.userId}/recipes`),
     orderBy("createdAt", "desc")
@@ -112,16 +111,41 @@ export function loadBrowseViewRecipes() {
   );
 }
 
-// 6) Render recipes grid (with Fuse.js fuzzy search)
+// 5) Toggle favorite flag in Firestore
+export async function toggleFavorite(recipeId, newValue) {
+  try {
+    const ref = doc(db, `artifacts/${appId}/users/${window.userId}/recipes`, recipeId);
+    await updateDoc(ref, { favorite: newValue });
+  } catch (err) {
+    showMessage(
+      document.getElementById("errorMessage"),
+      `Could not update favorite: ${err.message}`,
+      true
+    );
+  }
+}
+
+// 6) Lazy‐load images observer
+const imageObserver = new IntersectionObserver((entries, obs) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const img = entry.target;
+    if (img.dataset.src) {
+      img.src = img.dataset.src;
+      delete img.dataset.src;
+    }
+    obs.unobserve(img);
+  });
+}, { rootMargin: '100px', threshold: 0.1 });
+
+// 7) Render the grid with fuzzy search & favorites
 export function renderRecipes() {
   const grid = document.getElementById("recipesGridContainer");
   const placeholder = document.getElementById("recipesGridPlaceholder");
   if (!grid || !placeholder) return;
 
-  // clear existing cards
   grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
 
-  // if no data or signed out → placeholder
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
@@ -130,21 +154,29 @@ export function renderRecipes() {
     return;
   }
 
-  // gather, filter, fuzzy-search
-  let allRecipes = window.lastRecipeSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-  let filtered   = allRecipes.filter(r =>
-    window.currentCategoryFilter === "all" || r.category === window.currentCategoryFilter
-  );
-
+  // build & filter
+  let allRecipes = window.lastRecipeSnapshot.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+  // favorites filter
+  if (window.currentCategoryFilter === "favorites") {
+    allRecipes = allRecipes.filter(r => r.favorite);
+  } else {
+    allRecipes = allRecipes.filter(r =>
+      window.currentCategoryFilter === "all" ||
+      r.category === window.currentCategoryFilter
+    );
+  }
+  // fuzzy search
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
-    const fuse = new Fuse(filtered, { keys: ["title","tags"], threshold: 0.3, ignoreLocation: true });
-    filtered = fuse.search(term).map(r => r.item);
+    const fuse = new Fuse(allRecipes, { keys:["title","tags"], threshold:0.3, ignoreLocation:true });
+    allRecipes = fuse.search(term).map(r => r.item);
   }
 
-  // render
   let found = 0;
-  filtered.forEach(recipe => {
+  allRecipes.forEach((recipe, i) => {
     found++;
     const card = document.createElement("div");
     card.className = "recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative";
@@ -158,27 +190,43 @@ export function renderRecipes() {
     imgWrap.appendChild(shimmer);
 
     const img = document.createElement("img");
-    img.alt       = recipe.title;
-    img.src       = recipe.imageUrl;
-    img.loading   = "lazy";
+    img.alt = recipe.title;
     img.className = "recipe-card-image hidden object-cover w-full h-full";
-    img.onload    = () => { shimmer.remove(); img.classList.remove("hidden"); };
-    img.onerror   = () => {
+    img.loading = "lazy";
+    img.onload = () => { shimmer.remove(); img.classList.remove("hidden"); };
+    img.onerror = () => {
       shimmer.innerHTML = `
         <div class="flex items-center justify-center h-full text-slate-400">
           <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16
-                 m-2-2 1.586-1.586a2 2 0 012.828 0L20 14
-                 m-6-6h.01M6 20h12a2 2 0 002-2V6
-                 a2 2 0 00-2-2H6a2 2 0 00-2 2v12
-                 a2 2 0 002 2z"/>
+              d="M4 16l4.586-4.586a2 2 0
+                 012.828 0L16 16m-2-2 1.586-1.586
+                 a2 2 0 012.828 0L20 14m-6-6h.01
+                 M6 20h12a2 2 0 002-2V6a2 2 0
+                 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
         </div>`;
     };
-
+    if (i < 20) {
+      img.src = recipe.imageUrl;
+    } else {
+      img.dataset.src = recipe.imageUrl;
+      imageObserver.observe(img);
+    }
     imgWrap.appendChild(img);
     card.appendChild(imgWrap);
+
+    // favorite heart
+    const favBtn = document.createElement("button");
+    favBtn.innerHTML = recipe.favorite
+      ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white stroke-current stroke-2" fill="none" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+    favBtn.className = "absolute top-2 right-2 p-1 focus:outline-none";
+    favBtn.onclick = e => {
+      e.stopPropagation();
+      toggleFavorite(recipe.id, !recipe.favorite);
+    };
+    card.appendChild(favBtn);
 
     // text overlay
     const content = document.createElement("div");
@@ -190,7 +238,7 @@ export function renderRecipes() {
         </p>
         <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>
       </div>
-      <div class="absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0
+      <div class="absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 
                   group-hover:opacity-100 pointer-events-none w-full">
         <p class="text-xs font-semibold uppercase tracking-wider">
           ${recipe.category || "Uncategorized"}
@@ -203,34 +251,30 @@ export function renderRecipes() {
     grid.appendChild(card);
   });
 
-  // no matches?
   placeholder.style.display = found === 0 ? "block" : "none";
   if (found === 0) {
     placeholder.innerHTML = '<p class="text-center text-gray-500 py-8">No recipes found.</p>';
   }
 }
 
-// 7) Detail view
+// 8) Detail view
 export async function navigateToRecipeDetail(recipeId) {
   window.currentRecipeIdInDetailView = recipeId;
-  // reset placeholders...
-  document.getElementById("detailRecipeTitle").textContent    = "Loading…";
+  document.getElementById("detailRecipeTitle").textContent = "Loading…";
   document.getElementById("detailRecipeCategory").textContent = "";
-  document.getElementById("detailRecipeTags").innerHTML      = "";
+  document.getElementById("detailRecipeTags").innerHTML = "";
   document.getElementById("detailRecipeIngredients").innerHTML = "";
-  document.getElementById("detailRecipeDirections").innerHTML  = "";
-  document.getElementById("detailRecipeNotes").textContent     = "";
+  document.getElementById("detailRecipeDirections").innerHTML = "";
+  document.getElementById("detailRecipeNotes").textContent = "";
   document.getElementById("detailRecipeNotesContainer").classList.add("view-hidden");
   document.getElementById("detailRecipeTagsContainer").classList.add("view-hidden");
-  document.getElementById("detailImagePlaceholder").innerHTML   = `
+  document.getElementById("detailImagePlaceholder").innerHTML = `
     <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-        d="M4 16l4.586-4.586a2 2 0 
-           012.828 0L16 16m-2-2l1.586-1.586a2 
-           2 0 012.828 0L20 14m-6-6h.01
-           M6 20h12a2 2 0 002-2V6
-           a2 2 0 00-2-2H6a2 2 0
-           00-2 2v12a2 2 0 002 2z"/>
+        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16
+           m-2-2l1.586-1.586a2 2 0 012.828 0L20 14
+           m-6-6h.01M6 20h12a2 2 0 002-2V6
+           a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
     </svg>`;
 
   try {
@@ -242,15 +286,16 @@ export async function navigateToRecipeDetail(recipeId) {
       return showView("browseView");
     }
     const r = snap.data();
-    document.getElementById("detailRecipeTitle").textContent    = r.title;
+    document.getElementById("detailRecipeTitle").textContent = r.title;
     document.getElementById("detailRecipeCategory").textContent = r.category;
     if (r.imageUrl) {
       document.getElementById("detailImagePlaceholder").innerHTML = `
-        <img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">
-      `;
+        <img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">`;
     }
-    document.getElementById("detailRecipeIngredients").innerHTML = r.ingredients.map(i => `<li>${i}</li>`).join("");
-    document.getElementById("detailRecipeDirections").innerHTML = r.directions.map(d => `<li>${d}</li>`).join("");
+    document.getElementById("detailRecipeIngredients").innerHTML =
+      r.ingredients.map(i => `<li>${i}</li>`).join("");
+    document.getElementById("detailRecipeDirections").innerHTML =
+      r.directions.map(d => `<li>${d}</li>`).join("");
     if (r.tags?.length) {
       document.getElementById("detailRecipeTagsContainer").classList.remove("view-hidden");
       document.getElementById("detailRecipeTags").innerHTML =
@@ -269,7 +314,7 @@ export async function navigateToRecipeDetail(recipeId) {
   }
 }
 
-// 8) Populate form for edit
+// 9) Populate edit form
 export async function populateFormForEdit(recipeId) {
   try {
     const snap = await getDoc(
@@ -304,7 +349,7 @@ export async function populateFormForEdit(recipeId) {
   }
 }
 
-// 9) Delete a recipe
+// 10) Delete
 export async function handleDeleteRecipe() {
   const id = window.currentRecipeIdInDetailView;
   if (!id) return;
@@ -319,7 +364,7 @@ export async function handleDeleteRecipe() {
   }
 }
 
-// 10) Save (add or update) recipe
+// 11) Save form
 export async function handleRecipeFormSubmit(event) {
   event.preventDefault();
   const titleValue    = document.getElementById("recipeTitleInput").value.trim();
@@ -355,12 +400,12 @@ export async function handleRecipeFormSubmit(event) {
     }
 
     const data = {
-      title:       titleValue,
-      category:    categoryValue,
+      title: titleValue,
+      category: categoryValue,
       ingredients: [...window.currentIngredientsArray],
-      directions:  directions.split("\n").map(s => s.trim()).filter(Boolean),
-      notes:       notesValue,
-      tags:        tagsText.split(",").map(s => s.trim()).filter(Boolean)
+      directions: directions.split("\n").map(s => s.trim()).filter(Boolean),
+      notes: notesValue,
+      tags: tagsText.split(",").map(s => s.trim()).filter(Boolean)
     };
 
     const col = collection(db, `artifacts/${appId}/users/${window.userId}/recipes`);
@@ -370,7 +415,7 @@ export async function handleRecipeFormSubmit(event) {
       await updateDoc(doc(col, recipeIdToEdit), toUpdate);
       showMessage(document.getElementById("successMessage"), "Recipe updated successfully!");
     } else {
-      const toAdd = { ...data, userId: window.userId, createdAt: Timestamp.now() };
+      const toAdd = { ...data, userId: window.userId, createdAt: Timestamp.now(), favorite: false };
       if (imageUrlToSave) toAdd.imageUrl = imageUrlToSave;
       await addDoc(col, toAdd);
       showMessage(document.getElementById("successMessage"), "Recipe added successfully!");
@@ -389,22 +434,21 @@ export async function handleRecipeFormSubmit(event) {
   }
 }
 
-// 11) Generic toast
+// 12) Generic toast
 export function showMessage(element, userMessage, isError = false, duration = 4000) {
   if (isError) console.error(userMessage);
   element.textContent = userMessage;
   element.className = `
     p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg
-    ${isError ? "bg-red-500" : "bg-green-500"}`
-    .trim();
+    ${isError ? "bg-red-500" : "bg-green-500"}`.trim();
   element.classList.remove("hidden");
   setTimeout(() => element.classList.add("hidden"), duration);
 }
 
-// 12) Drag-and-drop reordering
+// 13) Drag‐and‐drop for ingredients
 document.addEventListener("DOMContentLoaded", () => {
   const listEl = document.getElementById("ingredientListDisplay");
-  if (!listEl) return;
+  if (!listEl || !Sortable) return;
   new Sortable(listEl, {
     animation: 150,
     onEnd: evt => {
