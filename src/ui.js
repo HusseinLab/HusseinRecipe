@@ -134,8 +134,10 @@ export function renderRecipes() {
   const placeholder = document.getElementById("recipesGridPlaceholder");
   if (!grid || !placeholder) return;
 
+  // remove only the cards
   grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
 
+  // no data or signed out → show placeholder
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
@@ -144,16 +146,19 @@ export function renderRecipes() {
     return;
   }
 
+  // build array
   const allRecipes = window.lastRecipeSnapshot.docs.map(d => ({
     id: d.id,
     ...d.data()
   }));
 
+  // category filter
   let filtered = allRecipes.filter(r =>
     window.currentCategoryFilter === "all" ||
     r.category === window.currentCategoryFilter
   );
 
+  // fuzzy search
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
     const fuse = new Fuse(filtered, {
@@ -165,50 +170,86 @@ export function renderRecipes() {
   }
 
   let found = 0;
-  filtered.forEach(recipe => {
+  filtered.forEach((recipe, i) => {
     found++;
+    // card wrapper
     const card = document.createElement("div");
     card.className = "recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative";
     card.onclick = () => window.location.hash = `/recipe/${recipe.id}`;
 
+    // image container
     const imgWrap = document.createElement("div");
     imgWrap.className = "recipe-thumb recipe-card-image-container relative";
-    if (recipe.imageUrl) {
-      const shimmer = document.createElement("div");
-      shimmer.className = "absolute inset-0 bg-slate-200 animate-pulse";
-      imgWrap.appendChild(shimmer);
-       // Eager-load first 20, otherwise defer via observer
-      if (i < 20) {
-        img.src = recipe.imageUrl;
-      } else {
-        imageObserver.observe(img);
-      }
+
+    // shimmer placeholder
+    const shimmer = document.createElement("div");
+    shimmer.className = "absolute inset-0 bg-slate-200 animate-pulse";
+    imgWrap.appendChild(shimmer);
+
+    // build the <img>
+    const img = document.createElement("img");
+    img.alt = recipe.title;
+    img.className = "recipe-card-image hidden object-cover w-full h-full";
+    img.loading = "lazy";
+
+    // on load/error cleanup
+    img.onload = () => {
+      shimmer.remove();
+      img.classList.remove("hidden");
+    };
+    img.onerror = () => {
+      shimmer.innerHTML = `
+        <div class="flex items-center justify-center h-full text-slate-400">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2
+                 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2
+                 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </div>`;
+    };
+
+    // eager-load first 20, otherwise observer
+    if (i < 20) {
+      img.src = recipe.imageUrl;
+    } else {
+      img.dataset.src = recipe.imageUrl;
+      imageObserver.observe(img);
+    }
+
+    imgWrap.appendChild(img);
+    card.appendChild(imgWrap);
+
+    // text content
+    const content = document.createElement("div");
+    content.className = "p-5 flex-grow flex flex-col";
+    content.innerHTML = `
+      <div class="transition-opacity duration-300 group-hover:opacity-0">
+        <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">
+          ${recipe.category || "Uncategorized"}
+        </p>
+        <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>
+      </div>
+      <div class="absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 
+                  group-hover:opacity-100 pointer-events-none w-full">
+        <p class="text-xs font-semibold uppercase tracking-wider">
+          ${recipe.category || "Uncategorized"}
+        </p>
+        <h3 class="text-xl font-bold leading-tight">${recipe.title}</h3>
+      </div>
+    `;
+    card.appendChild(content);
 
     grid.appendChild(card);
   });
-      const img = document.createElement("img");
-      img.dataset.src = recipe.imageUrl;
-      img.alt = recipe.title;
-      img.className = "recipe-card-image hidden object-cover w-full h-full";
-      img.loading = "lazy";
-      img.onload = () => {
-        shimmer.remove();
-        img.classList.remove("hidden");
-      };
-      img.onerror = () => {
-        shimmer.innerHTML = `<div class="flex items-center justify-center h-full text-slate-400">
-          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M4 16l4.586-4.586a2 2 0
-                 012.828 0L16 16m-2-2 1.586-1.586
-                 a2 2 0 012.828 0L20 14m-6-6h.01
-                 M6 20h12a2 2 0 002-2V6a2 2 0
-                 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-          </svg>
-        </div>`;
-      };
-      imgWrap.appendChild(img);
-    } else {
+
+  // no matches?
+  placeholder.style.display = found === 0 ? "block" : "none";
+  if (found === 0) {
+    placeholder.innerHTML = '<p class="text-center text-gray-500 py-8">No recipes found.</p>';
+  }
+}
+ else {
       imgWrap.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-slate-200">
         <svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
