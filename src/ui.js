@@ -17,18 +17,18 @@ import {
   getDownloadURL,
   marked
 } from "./firebase.js";
-
-// Drag-and-drop library
 import Sortable from "https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/modular/sortable.esm.js";
 
-// Common ingredients for autocomplete
+// default filter & ingredients array so we show “All Recipes” on first load
+window.currentCategoryFilter    = "all";
+window.currentIngredientsArray  = [];
+
 const COMMON_INGREDIENTS = [
   "Flour","Sugar","Salt","Olive oil","Butter","Eggs",
   "Milk","Baking powder","Garlic","Onion","Tomato","Pepper",
   "Chicken breast","Ground beef","Rice","Pasta","Herbs","Spices"
 ];
 
-// Application ID fallback
 const appId = typeof __app_id !== "undefined"
   ? __app_id
   : "default-recipe-app-id";
@@ -48,8 +48,8 @@ export function showView(viewIdToShow) {
   ["browseView","recipeDetailView","recipeFormView"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.classList.toggle("view-active", id === viewIdToShow);
-    el.classList.toggle("view-hidden", id !== viewIdToShow);
+    el.classList.toggle("view-active",   id === viewIdToShow);
+    el.classList.toggle("view-hidden",   id !== viewIdToShow);
   });
   if (viewIdToShow === "browseView") loadBrowseViewRecipes();
 }
@@ -112,20 +112,7 @@ export function loadBrowseViewRecipes() {
   );
 }
 
-// 5) Lazy-load images observer
-const imageObserver = new IntersectionObserver((entries, obs) => {
-  entries.forEach(entry => {
-    if (!entry.isIntersecting) return;
-    const img = entry.target;
-    if (img.dataset.src) {
-      img.src = img.dataset.src;
-      delete img.dataset.src;
-    }
-    obs.unobserve(img);
-  });
-}, { rootMargin: '100px', threshold: 0.1 });
-
-// 6) Render recipes grid (with Fuse.js fuzzy search & lazy images)
+// 6) Render recipes grid (with Fuse.js fuzzy search)
 export function renderRecipes() {
   const grid = document.getElementById("recipesGridContainer");
   const placeholder = document.getElementById("recipesGridPlaceholder");
@@ -145,9 +132,10 @@ export function renderRecipes() {
 
   // gather, filter, fuzzy-search
   let allRecipes = window.lastRecipeSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-  let filtered = allRecipes.filter(r =>
+  let filtered   = allRecipes.filter(r =>
     window.currentCategoryFilter === "all" || r.category === window.currentCategoryFilter
   );
+
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
     const fuse = new Fuse(filtered, { keys: ["title","tags"], threshold: 0.3, ignoreLocation: true });
@@ -156,9 +144,8 @@ export function renderRecipes() {
 
   // render
   let found = 0;
-  filtered.forEach((recipe, i) => {
+  filtered.forEach(recipe => {
     found++;
-    // card
     const card = document.createElement("div");
     card.className = "recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative";
     card.onclick = () => window.location.hash = `/recipe/${recipe.id}`;
@@ -171,11 +158,12 @@ export function renderRecipes() {
     imgWrap.appendChild(shimmer);
 
     const img = document.createElement("img");
-    img.alt = recipe.title;
+    img.alt       = recipe.title;
+    img.src       = recipe.imageUrl;
+    img.loading   = "lazy";
     img.className = "recipe-card-image hidden object-cover w-full h-full";
-    img.loading = "lazy";
-    img.onload = () => { shimmer.remove(); img.classList.remove("hidden"); };
-    img.onerror = () => {
+    img.onload    = () => { shimmer.remove(); img.classList.remove("hidden"); };
+    img.onerror   = () => {
       shimmer.innerHTML = `
         <div class="flex items-center justify-center h-full text-slate-400">
           <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,8 +177,6 @@ export function renderRecipes() {
         </div>`;
     };
 
-    img.src = recipe.imageUrl;
-    
     imgWrap.appendChild(img);
     card.appendChild(imgWrap);
 
@@ -199,11 +185,16 @@ export function renderRecipes() {
     content.className = "p-5 flex-grow flex flex-col";
     content.innerHTML = `
       <div class="transition-opacity duration-300 group-hover:opacity-0">
-        <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">${recipe.category || "Uncategorized"}</p>
+        <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">
+          ${recipe.category || "Uncategorized"}
+        </p>
         <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>
       </div>
-      <div class="absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none w-full">
-        <p class="text-xs font-semibold uppercase tracking-wider">${recipe.category || "Uncategorized"}</p>
+      <div class="absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0
+                  group-hover:opacity-100 pointer-events-none w-full">
+        <p class="text-xs font-semibold uppercase tracking-wider">
+          ${recipe.category || "Uncategorized"}
+        </p>
         <h3 class="text-xl font-bold leading-tight">${recipe.title}</h3>
       </div>
     `;
@@ -223,15 +214,15 @@ export function renderRecipes() {
 export async function navigateToRecipeDetail(recipeId) {
   window.currentRecipeIdInDetailView = recipeId;
   // reset placeholders...
-  document.getElementById("detailRecipeTitle").textContent = "Loading…";
+  document.getElementById("detailRecipeTitle").textContent    = "Loading…";
   document.getElementById("detailRecipeCategory").textContent = "";
-  document.getElementById("detailRecipeTags").innerHTML = "";
+  document.getElementById("detailRecipeTags").innerHTML      = "";
   document.getElementById("detailRecipeIngredients").innerHTML = "";
-  document.getElementById("detailRecipeDirections").innerHTML = "";
-  document.getElementById("detailRecipeNotes").textContent = "";
+  document.getElementById("detailRecipeDirections").innerHTML  = "";
+  document.getElementById("detailRecipeNotes").textContent     = "";
   document.getElementById("detailRecipeNotesContainer").classList.add("view-hidden");
   document.getElementById("detailRecipeTagsContainer").classList.add("view-hidden");
-  document.getElementById("detailImagePlaceholder").innerHTML = `
+  document.getElementById("detailImagePlaceholder").innerHTML   = `
     <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
         d="M4 16l4.586-4.586a2 2 0 
@@ -251,17 +242,15 @@ export async function navigateToRecipeDetail(recipeId) {
       return showView("browseView");
     }
     const r = snap.data();
-    document.getElementById("detailRecipeTitle").textContent = r.title;
+    document.getElementById("detailRecipeTitle").textContent    = r.title;
     document.getElementById("detailRecipeCategory").textContent = r.category;
     if (r.imageUrl) {
       document.getElementById("detailImagePlaceholder").innerHTML = `
         <img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">
       `;
     }
-    document.getElementById("detailRecipeIngredients").innerHTML =
-      r.ingredients.map(i => `<li>${i}</li>`).join("");
-    document.getElementById("detailRecipeDirections").innerHTML =
-      r.directions.map(d => `<li>${d}</li>`).join("");
+    document.getElementById("detailRecipeIngredients").innerHTML = r.ingredients.map(i => `<li>${i}</li>`).join("");
+    document.getElementById("detailRecipeDirections").innerHTML = r.directions.map(d => `<li>${d}</li>`).join("");
     if (r.tags?.length) {
       document.getElementById("detailRecipeTagsContainer").classList.remove("view-hidden");
       document.getElementById("detailRecipeTags").innerHTML =
@@ -366,12 +355,12 @@ export async function handleRecipeFormSubmit(event) {
     }
 
     const data = {
-      title: titleValue,
-      category: categoryValue,
+      title:       titleValue,
+      category:    categoryValue,
       ingredients: [...window.currentIngredientsArray],
-      directions: directions.split("\n").map(s => s.trim()).filter(Boolean),
-      notes: notesValue,
-      tags: tagsText.split(",").map(s => s.trim()).filter(Boolean)
+      directions:  directions.split("\n").map(s => s.trim()).filter(Boolean),
+      notes:       notesValue,
+      tags:        tagsText.split(",").map(s => s.trim()).filter(Boolean)
     };
 
     const col = collection(db, `artifacts/${appId}/users/${window.userId}/recipes`);
@@ -412,7 +401,7 @@ export function showMessage(element, userMessage, isError = false, duration = 40
   setTimeout(() => element.classList.add("hidden"), duration);
 }
 
-// 12) Drag-and-drop reordering for ingredients
+// 12) Drag-and-drop reordering
 document.addEventListener("DOMContentLoaded", () => {
   const listEl = document.getElementById("ingredientListDisplay");
   if (!listEl) return;
