@@ -1,5 +1,3 @@
-// src/ui.js
-
 import {
   db,
   collection,
@@ -18,12 +16,14 @@ import {
   marked
 } from "./firebase.js";
 
+// Common ingredients for autocomplete
 const COMMON_INGREDIENTS = [
   "Flour","Sugar","Salt","Olive oil","Butter","Eggs",
   "Milk","Baking powder","Garlic","Onion","Tomato","Pepper",
   "Chicken breast","Ground beef","Rice","Pasta","Herbs","Spices"
 ];
 
+// Your application ID
 const appId = typeof __app_id !== "undefined"
   ? __app_id
   : "default-recipe-app-id";
@@ -36,15 +36,16 @@ export function populateIngredientSuggestions() {
     .map(ing => `<option value="${ing}">`)
     .join("");
 }
+// Fire on initial load
 document.addEventListener("DOMContentLoaded", populateIngredientSuggestions);
 
-// 1) View switching
+// 1) Switch between views
 export function showView(viewIdToShow) {
-  ["browseView","recipeDetailView","recipeFormView"].forEach((viewId) => {
-    const el = document.getElementById(viewId);
+  ["browseView","recipeDetailView","recipeFormView"].forEach(id => {
+    const el = document.getElementById(id);
     if (!el) return;
-    el.classList.toggle("view-active", viewId === viewIdToShow);
-    el.classList.toggle("view-hidden", viewId !== viewIdToShow);
+    el.classList.toggle("view-active", id === viewIdToShow);
+    el.classList.toggle("view-hidden", id !== viewIdToShow);
   });
   if (viewIdToShow === "browseView") {
     loadBrowseViewRecipes();
@@ -69,8 +70,7 @@ export function renderIngredientList() {
   (window.currentIngredientsArray || []).forEach((ing, idx) => {
     const div = document.createElement("div");
     div.className = "ingredient-item flex items-center justify-between bg-gray-100 p-2 pl-3 rounded-md text-sm";
-    div.innerHTML = `<span>${ing}</span>
-      <button title="Remove" class="ml-2 text-red-500 hover:text-red-700">&times;</button>`;
+    div.innerHTML = `<span>${ing}</span><button title=\"Remove\" class=\"ml-2 text-red-500 hover:text-red-700\">&times;</button>`;
     div.querySelector("button").onclick = () => {
       window.currentIngredientsArray.splice(idx, 1);
       renderIngredientList();
@@ -79,9 +79,9 @@ export function renderIngredientList() {
   });
 }
 
-// 3) Highlight active category button
+// 3) Highlight the active category button
 export function updateCategoryButtonStyles() {
-  document.querySelectorAll(".category-filter-btn").forEach((btn) => {
+  document.querySelectorAll(".category-filter-btn").forEach(btn => {
     btn.classList.toggle(
       "category-filter-btn-active",
       btn.dataset.category === window.currentCategoryFilter
@@ -102,11 +102,11 @@ export function loadBrowseViewRecipes() {
   );
   window.recipesUnsubscribe = onSnapshot(
     q,
-    (snap) => {
+    snap => {
       window.lastRecipeSnapshot = snap;
       renderRecipes();
     },
-    (err) => {
+    err => {
       showMessage(
         document.getElementById("errorMessage"),
         `Error fetching recipes: ${err.message}`,
@@ -116,6 +116,7 @@ export function loadBrowseViewRecipes() {
   );
 }
 
+// IntersectionObserver for lazy-loading
 const imageObserver = new IntersectionObserver((entries, obs) => {
   entries.forEach(entry => {
     if (!entry.isIntersecting) return;
@@ -134,10 +135,10 @@ export function renderRecipes() {
   const placeholder = document.getElementById("recipesGridPlaceholder");
   if (!grid || !placeholder) return;
 
-  // remove only the cards
+  // Remove existing cards
   grid.querySelectorAll(".recipe-card").forEach(c => c.remove());
 
-  // no data or signed out → show placeholder
+  // If no data or signed out → show placeholder
   if (!window.lastRecipeSnapshot || !window.userId) {
     placeholder.style.display = "block";
     placeholder.innerHTML = window.userId
@@ -146,122 +147,67 @@ export function renderRecipes() {
     return;
   }
 
-  // build array
-  const allRecipes = window.lastRecipeSnapshot.docs.map(d => ({
-    id: d.id,
-    ...d.data()
-  }));
+  // Build array of all recipes
+  const allRecipes = window.lastRecipeSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // category filter
+  // Apply category filter
   let filtered = allRecipes.filter(r =>
-    window.currentCategoryFilter === "all" ||
-    r.category === window.currentCategoryFilter
+    window.currentCategoryFilter === "all" || r.category === window.currentCategoryFilter
   );
 
-  // fuzzy search
+  // Fuzzy search via Fuse.js if term exists
   const term = (document.getElementById("headerSearchInput").value || "").trim();
   if (term) {
-    const fuse = new Fuse(filtered, {
-      keys: ["title", "tags"],
-      threshold: 0.3,
-      ignoreLocation: true
-    });
+    const fuse = new Fuse(filtered, { keys: ["title","tags"], threshold: 0.3, ignoreLocation: true });
     filtered = fuse.search(term).map(res => res.item);
   }
 
   let found = 0;
   filtered.forEach((recipe, i) => {
     found++;
-    // card wrapper
+    // Card container
     const card = document.createElement("div");
     card.className = "recipe-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer group relative";
     card.onclick = () => window.location.hash = `/recipe/${recipe.id}`;
 
-    // image container
+    // Image wrapper
     const imgWrap = document.createElement("div");
     imgWrap.className = "recipe-thumb recipe-card-image-container relative";
 
-    // shimmer placeholder
+    // Shimmer placeholder
     const shimmer = document.createElement("div");
     shimmer.className = "absolute inset-0 bg-slate-200 animate-pulse";
     imgWrap.appendChild(shimmer);
 
-    // build the <img>
+    // Create image element
     const img = document.createElement("img");
     img.alt = recipe.title;
     img.className = "recipe-card-image hidden object-cover w-full h-full";
     img.loading = "lazy";
-
-    // on load/error cleanup
-    img.onload = () => {
-      shimmer.remove();
-      img.classList.remove("hidden");
-    };
+    img.onload = () => { shimmer.remove(); img.classList.remove("hidden"); };
     img.onerror = () => {
       shimmer.innerHTML = `
         <div class="flex items-center justify-center h-full text-slate-400">
           <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2
-                 1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2
-                 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.586-1.586
+                 a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6
+                 a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
         </div>`;
     };
 
-    // eager-load first 20, otherwise observer
+    // Eager-load first 20, otherwise lazy via observer
     if (i < 20) {
       img.src = recipe.imageUrl;
     } else {
       img.dataset.src = recipe.imageUrl;
       imageObserver.observe(img);
     }
-
     imgWrap.appendChild(img);
     card.appendChild(imgWrap);
 
-    // text content
-    const content = document.createElement("div");
-    content.className = "p-5 flex-grow flex flex-col";
-    content.innerHTML = `
-      <div class="transition-opacity duration-300 group-hover:opacity-0">
-        <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">
-          ${recipe.category || "Uncategorized"}
-        </p>
-        <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>
-      </div>
-      <div class="absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 
-                  group-hover:opacity-100 pointer-events-none w-full">
-        <p class="text-xs font-semibold uppercase tracking-wider">
-          ${recipe.category || "Uncategorized"}
-        </p>
-        <h3 class="text-xl font-bold leading-tight">${recipe.title}</h3>
-      </div>
-    `;
-    card.appendChild(content);
-
-    grid.appendChild(card);
-  });
-
-  // no matches?
-  placeholder.style.display = found === 0 ? "block" : "none";
-  if (found === 0) {
-    placeholder.innerHTML = '<p class="text-center text-gray-500 py-8">No recipes found.</p>';
-  }
-}
- else {
-      imgWrap.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-slate-200">
-        <svg class="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M4 16l4.586-4.586a2 2 0 
-               012.828 0L16 16m-2-2 1.586-1.586
-               a2 2 0 012.828 0L20 14m-6-6h.01
-               M6 20h12a2 2 0 002-2V6a2 2 0 
-               00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
-      </div>`;
-    }
-
+    // Text content
     const content = document.createElement("div");
     content.className = "p-5 flex-grow flex flex-col";
     const original = document.createElement("div");
@@ -270,22 +216,21 @@ export function renderRecipes() {
       <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">
         ${recipe.category || "Uncategorized"}
       </p>
-      <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>
-    `;
+      <h3 class="text-xl font-bold text-gray-800">${recipe.title}</h3>`;
     const hoverText = document.createElement("div");
     hoverText.className = "absolute bottom-0 left-0 p-5 text-white transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none w-full";
     hoverText.innerHTML = `
       <p class="text-xs font-semibold uppercase tracking-wider">${recipe.category || "Uncategorized"}</p>
-      <h3 class="text-xl font-bold leading-tight">${recipe.title}</h3>
-    `;
+      <h3 class="text-xl font-bold leading-tight">${recipe.title}</h3>`;
 
     content.appendChild(original);
-    card.appendChild(imgWrap);
     card.appendChild(content);
     card.appendChild(hoverText);
+
     grid.appendChild(card);
   });
 
+  // Show "no recipes found" if none
   placeholder.style.display = found === 0 ? "block" : "none";
   if (found === 0) {
     placeholder.innerHTML = '<p class="text-center text-gray-500 py-8">No recipes found.</p>';
@@ -296,6 +241,7 @@ export function renderRecipes() {
 export async function navigateToRecipeDetail(recipeId) {
   window.currentRecipeIdInDetailView = recipeId;
   document.getElementById("detailRecipeTitle").textContent = "Loading…";
+  // reset other placeholders...
   document.getElementById("detailRecipeCategory").textContent = "";
   document.getElementById("detailRecipeTags").innerHTML = "";
   document.getElementById("detailRecipeIngredients").innerHTML = "";
@@ -303,16 +249,7 @@ export async function navigateToRecipeDetail(recipeId) {
   document.getElementById("detailRecipeNotes").textContent = "";
   document.getElementById("detailRecipeNotesContainer").classList.add("view-hidden");
   document.getElementById("detailRecipeTagsContainer").classList.add("view-hidden");
-  document.getElementById("detailImagePlaceholder").innerHTML = `
-    <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-        d="M4 16l4.586-4.586a2 2 0 
-           012.828 0L16 16m-2-2l1.586-1.586a2 
-           2 0 012.828 0L20 14m-6-6h.01
-           M6 20h12a2 2 0 002-2V6
-           a2 2 0 00-2-2H6a2 2 0
-           00-2 2v12a2 2 0 002 2z"/>
-    </svg>`;
+  document.getElementById("detailImagePlaceholder").innerHTML = `<svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
 
   try {
     const snap = await getDoc(
@@ -327,17 +264,13 @@ export async function navigateToRecipeDetail(recipeId) {
     document.getElementById("detailRecipeTitle").textContent = r.title;
     document.getElementById("detailRecipeCategory").textContent = r.category;
     if (r.imageUrl) {
-      document.getElementById("detailImagePlaceholder").innerHTML = `
-        <img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">
-      `;
+      document.getElementById("detailImagePlaceholder").innerHTML = `<img src="${r.imageUrl}" alt="${r.title}" class="w-full h-full object-cover rounded-lg">`;
     }
     document.getElementById("detailRecipeIngredients").innerHTML = r.ingredients.map(i => `<li>${i}</li>`).join("");
     document.getElementById("detailRecipeDirections").innerHTML = r.directions.map(d => `<li>${d}</li>`).join("");
     if (r.tags?.length) {
       document.getElementById("detailRecipeTagsContainer").classList.remove("view-hidden");
-      document.getElementById("detailRecipeTags").innerHTML = r.tags
-        .map(t => `<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">${t}</span>`)
-        .join("");
+      document.getElementById("detailRecipeTags").innerHTML = r.tags.map(t => `<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">${t}</span>`).join("");
     }
     if (r.notes?.trim()) {
       document.getElementById("detailRecipeNotesContainer").classList.remove("view-hidden");
@@ -370,8 +303,7 @@ export async function populateFormForEdit(recipeId) {
     document.getElementById("recipeIdInput").value = recipeId;
     document.getElementById("formTitle").textContent = "Edit Recipe";
     if (r.imageUrl) {
-      const prev = document.getElementById("imagePreview");
-      prev.src = r.imageUrl;
+      const prev = document.getElementById("imagePreview"); prev.src = r.imageUrl;
       document.getElementById("imagePreviewContainer").classList.remove("hidden");
     }
     showView("recipeFormView");
@@ -395,7 +327,7 @@ export async function handleDeleteRecipe() {
   }
 }
 
-// 9) Save (add or update) recipe
+// 9) Save (add or update) a recipe
 export async function handleRecipeFormSubmit(event) {
   event.preventDefault();
   const titleValue    = document.getElementById("recipeTitleInput").value.trim();
@@ -404,21 +336,20 @@ export async function handleRecipeFormSubmit(event) {
   const notesValue    = document.getElementById("recipeNotesInput").value.trim();
   const tagsText      = document.getElementById("recipeTagsInput").value.trim();
   const recipeIdToEdit= document.getElementById("recipeIdInput").value;
-  if (!titleValue || !categoryValue || (window.currentIngredientsArray||[]).length === 0 || !directions) {
+  if (!titleValue || !categoryValue || (window.currentIngredientsArray||[]).length===0 || !directions) {
     showMessage(document.getElementById("errorMessage"),
       "Title, Category, at least one Ingredient, and Directions are required.", true);
     return;
   }
   const loadingEl = document.getElementById("loadingIndicator");
   loadingEl.classList.remove("hidden");
-
   try {
     let imageUrlToSave;
     const previewEl = document.getElementById("imagePreview");
     if (previewEl.src.startsWith("blob:")) {
       const fileInput = document.getElementById("recipeImageInput");
       const file = fileInput.files[0];
-      const imageName = `${window.userId}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const imageName = `${window.userId}_${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
       const ref = storageRef(storage, `recipe_images/${window.userId}/${imageName}`);
       const uploadTask = uploadBytesResumable(ref, file);
       await new Promise((res, rej) => uploadTask.on("state_changed", null, rej, res));
@@ -426,58 +357,50 @@ export async function handleRecipeFormSubmit(event) {
     } else if (recipeIdToEdit) {
       imageUrlToSave = previewEl.src.startsWith("http") ? previewEl.src : null;
     }
-
-    const data = {
-      title: titleValue,
-      category: categoryValue,
-      ingredients: [...window.currentIngredientsArray],
-      directions: directions.split("\n").map(s => s.trim()).filter(Boolean),
-      notes: notesValue,
-      tags: tagsText.split(",").map(s => s.trim()).filter(Boolean)
+    const data = { title: titleValue, category: categoryValue,
+      ingredients:[...window.currentIngredientsArray],
+      directions:directions.split("\n").map(s=>s.trim()).filter(Boolean),
+      notes:notesValue, tags:tagsText.split(",").map(s=>s.trim()).filter(Boolean)
     };
     const col = collection(db, `artifacts/${appId}/users/${window.userId}/recipes`);
-
     if (recipeIdToEdit) {
-      const toUpdate = { ...data, lastUpdatedAt: Timestamp.now() };
-      if (imageUrlToSave !== undefined) toUpdate.imageUrl = imageUrlToSave;
+      const toUpdate={...data, lastUpdatedAt:Timestamp.now()};
+      if (imageUrlToSave!==undefined) toUpdate.imageUrl=imageUrlToSave;
       await updateDoc(doc(col, recipeIdToEdit), toUpdate);
       showMessage(document.getElementById("successMessage"), "Recipe updated successfully!");
     } else {
-      const toAdd = { ...data, userId: window.userId, createdAt: Timestamp.now() };
-      if (imageUrlToSave) toAdd.imageUrl = imageUrlToSave;
+      const toAdd={...data, userId:window.userId, createdAt:Timestamp.now()};
+      if (imageUrlToSave) toAdd.imageUrl=imageUrlToSave;
       await addDoc(col, toAdd);
       showMessage(document.getElementById("successMessage"), "Recipe added successfully!");
     }
-
-    resetRecipeForm();
-    showView("browseView");
-  } catch (err) {
+    resetRecipeForm(); showView("browseView");
+  } catch(err) {
     showMessage(document.getElementById("errorMessage"), `Error saving recipe: ${err.message}`, true);
   } finally {
     loadingEl.classList.add("hidden");
   }
 }
 
-// 10) Generic toast
-export function showMessage(element, userMessage, isError = false, duration = 4000) {
+// 10) Generic toast message
+export function showMessage(element, userMessage, isError=false, duration=4000) {
   if (isError) console.error(userMessage);
   element.textContent = userMessage;
   element.className = `
     p-3 text-sm text-white rounded-lg fixed top-24 right-5 z-50 shadow-lg
-    ${isError ? "bg-red-500" : "bg-green-500"}`
-    .replace(/\s+/g, " ")
-    .trim();
+    ${isError?"bg-red-500":"bg-green-500"}`.replace(/\s+/g," ").trim();
   element.classList.remove("hidden");
   setTimeout(() => element.classList.add("hidden"), duration);
 }
 
-// 11) Enable drag-and-drop reordering of ingredients
+// 11) Enable drag-and-drop ordering of ingredients
+import Sortable from "sortablejs";
 document.addEventListener("DOMContentLoaded", () => {
   const listEl = document.getElementById("ingredientListDisplay");
-  if (!listEl || !window.Sortable) return;
+  if (!listEl) return;
   new Sortable(listEl, {
     animation: 150,
-    onEnd: (evt) => {
+    onEnd: evt => {
       const moved = window.currentIngredientsArray.splice(evt.oldIndex, 1)[0];
       window.currentIngredientsArray.splice(evt.newIndex, 0, moved);
       renderIngredientList();
