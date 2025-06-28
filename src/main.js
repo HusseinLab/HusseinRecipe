@@ -27,6 +27,15 @@ import {
   handleRecipeFormSubmit
 } from "./ui.js";
 
+document.querySelectorAll(".category-filter-btn").forEach(btn =>
+  btn.addEventListener("click", () => {
+    // whatever category that button carries
+    window.currentCategoryFilter = btn.dataset.category;
+    updateCategoryButtonStyles();
+    renderRecipes();
+  })
+);
+
 document.addEventListener("DOMContentLoaded", () => {
   // ── 1) Initialize router & default route ─────────
   initRouter();
