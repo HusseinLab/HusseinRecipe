@@ -189,14 +189,8 @@ export function renderRecipes() {
         </div>`;
     };
 
-    // eager first 20, then lazy
-    if (i < 20) {
-      img.src = recipe.imageUrl;
-    } else {
-      img.dataset.src = recipe.imageUrl;
-      imageObserver.observe(img);
-    }
-
+    img.src = recipe.imageUrl;
+    
     imgWrap.appendChild(img);
     card.appendChild(imgWrap);
 
